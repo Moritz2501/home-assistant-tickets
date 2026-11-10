@@ -352,6 +352,7 @@ Einzufügen über **Dashboard → Stift → Drei-Punkte-Menü → Raw-Konfigurat
 │       ├── const.py               # Domäne, Feldwerte, Events
 │       ├── manager.py             # Ticket-CRUD + Persistenz
 │       ├── manifest.json
+│       ├── brand/icon.png         # Icon für Geräte-UI und HACS
 │       ├── sensor.py              # 4 Zähler-Sensoren
 │       ├── services.py            # create / update / set_status / delete
 │       ├── services.yaml          # Felddefinitionen für die UI

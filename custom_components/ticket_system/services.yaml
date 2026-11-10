@@ -5,7 +5,6 @@ create:
       example: "Heizung im Wohnzimmer defekt"
       selector:
         text:
-          max_length: 200
     description:
       example: "Seit heute Morgen wird die Heizung nicht mehr warm."
       selector:
@@ -51,7 +50,6 @@ update:
     title:
       selector:
         text:
-          max_length: 200
     description:
       selector:
         text:
