@@ -13,6 +13,27 @@
       "single_instance_allowed": "The ticket system is already set up. Only one instance is possible."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Notifications",
+        "description": "Choose who is informed about tickets and whether critical tickets are spoken aloud.",
+        "data": {
+          "notify_services": "Notify services for the team",
+          "creator_notify_services": "Notify services for ticket creators (empty = team services)",
+          "notify_on_create": "Notify on new tickets",
+          "notify_on_close": "Notify the creator when a ticket is closed",
+          "notify_critical_tts": "Speak critical tickets aloud",
+          "tts_entity": "Text-to-speech entity",
+          "tts_media_players": "Media players for announcements",
+          "tts_message": "Spoken text"
+        },
+        "data_description": {
+          "tts_message": "Placeholders: {title}, {priority}, {author}, {id}"
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "open_tickets": {
@@ -53,6 +74,10 @@
         "author": {
           "name": "Author",
           "description": "Creator of the ticket."
+        },
+        "notify": {
+          "name": "Send notifications",
+          "description": "Whether the team (and for critical tickets the media players) is notified about this ticket."
         }
       }
     },
@@ -102,6 +127,36 @@
         "ticket_id": {
           "name": "Ticket ID",
           "description": "ID of the ticket to delete."
+        }
+      }
+    },
+    "notify": {
+      "name": "Notify about ticket",
+      "description": "Sends an info or a reminder about an existing ticket.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket ID",
+          "description": "ID of the ticket the message is about."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Information or reminder."
+        },
+        "target": {
+          "name": "Recipients",
+          "description": "Team, creator or both."
+        },
+        "message": {
+          "name": "Message",
+          "description": "Custom text. Empty uses the generated text."
+        },
+        "title": {
+          "name": "Title",
+          "description": "Custom title of the notification."
+        },
+        "notify_service": {
+          "name": "Notify service",
+          "description": "Send only via this service, for example mobile_app_pixel."
         }
       }
     }

@@ -12,8 +12,10 @@ Cloud, ohne Datenbank-Server. Tickets werden direkt in Home Assistant gespeicher
 Enthalten sind außerdem:
 
 - vier Sensoren (offen, in Bearbeitung, kritisch, gesamt)
-- vier Services inkl. Antwortdaten für Automatisierungen
+- fünf Services inkl. Antwortdaten für Automatisierungen
 - drei Events (`ticket_system_ticket_created` / `_updated` / `_deleted`)
+- **Benachrichtigungen** bei neuen Tickets, Sprachausgabe für kritische Tickets und
+  Rückmeldung an den Ersteller bei Abschluss (konfigurierbar über die Optionen)
 - deutsche und englische Oberflächentexte, deutsche **und** englische Service-Werte
   (`high` = `Hoch`, `in_progress` = `In Bearbeitung`, …)
 - automatische Auslieferung der Karten durch die Integration – keine manuelle
@@ -23,7 +25,7 @@ Enthalten sind außerdem:
 
 ## Voraussetzungen
 
-- Home Assistant **2024.7** oder neuer
+- Home Assistant **2024.11** oder neuer
 - Lovelace (Standard-Dashboard) für die Karten
 - HACS ist optional, aber empfohlen
 
@@ -115,6 +117,7 @@ Schreibweisen.
 | `priority` | nein | `medium` | Dringlichkeit |
 | `status` | nein | `open` | Anfangsstatus |
 | `author` | nein | `Unbekannt` | Ersteller |
+| `notify` | nein | `true` | Team (und bei „Kritisch“ die Mediaplayer) über dieses Ticket informieren |
 
 ```yaml
 action: ticket_system.create
@@ -175,6 +178,48 @@ data:
   ticket_id: "20261110-114800-a1b2c3"
 ```
 
+### `ticket_system.notify`
+
+Verschickt eine Information oder Erinnerung zu einem bestehenden Ticket – gedacht für
+Automationen und die Schnellaktionen der Verwaltungskarte.
+
+| Feld | Pflicht | Standard | Beschreibung |
+| --- | --- | --- | --- |
+| `ticket_id` | ja | – | ID des Tickets |
+| `kind` | nein | `info` | `info` (Sachstand) oder `reminder` (Erinnerung inkl. Wartezeit) |
+| `target` | nein | `admins` | `admins`, `creator` oder `all` |
+| `message` | nein | automatisch | eigener Nachrichtentext |
+| `title` | nein | automatisch | eigener Titel |
+| `notify_service` | nein | – | nur diesen Dienst nutzen, z. B. `mobile_app_pixel` |
+
+```yaml
+action: ticket_system.notify
+data:
+  ticket_id: "20261110-114800-a1b2c3"
+  kind: reminder
+  target: admins
+```
+
+```yaml
+action: ticket_system.notify
+data:
+  ticket_id: "20261110-114800-a1b2c3"
+  notify_service: mobile_app_pixel
+  title: "Bitte übernehmen"
+  message: "Das Ticket wartet seit heute Morgen auf einen Techniker."
+```
+
+Antwort (nur mit `response_variable` abrufbar):
+
+```yaml
+sent:
+  - notify.persistent_notification
+failed: []
+```
+
+Konnte über keinen Dienst gesendet werden, bricht der Service mit einer verständlichen
+Fehlermeldung ab (z. B. wenn in den Optionen nur gelöschte Dienste stehen).
+
 > Hinweis: Unbekannte Ticket-IDs führen zu einem verständlichen Fehler
 > (`Ticket '…' wurde nicht gefunden.`). `create` gibt als einziger Service
 > `ticket_id` zurück; `update` und `set_status` geben das aktualisierte `ticket` zurück.
@@ -188,8 +233,10 @@ Für Automatisierungen feuert die Integration drei Events auf dem Event-Bus:
 | Event | Nutzdaten |
 | --- | --- |
 | `ticket_system_ticket_created` | `{ "ticket": { … } }` |
-| `ticket_system_ticket_updated` | `{ "ticket": { … } }` |
+| `ticket_system_ticket_updated` | `{ "ticket": { … }, "changes": ["status"] }` |
 | `ticket_system_ticket_deleted` | `{ "ticket": { … } }` |
+
+`changes` enthält nur die Felder, die sich tatsächlich geändert haben.
 
 ```yaml
 trigger:
@@ -209,12 +256,68 @@ Weitere Beispiele: [`examples/automations.yaml`](examples/automations.yaml).
 
 ---
 
+## Benachrichtigungen
+
+Die Integration meldet sich von selbst – ohne Automatisierung. Einstellungen unter
+**Einstellungen → Geräte & Dienste → Ticketsystem → Konfigurieren**. Änderungen greifen
+sofort, ein Neustart ist nicht nötig.
+
+### Optionen
+
+| Option | Standard | Bedeutung |
+| --- | --- | --- |
+| Benachrichtigungsdienste für das Team | `notify.persistent_notification` | Mehrfachauswahl, z. B. `notify.persistent_notification`, `notify.mobile_app_pixel`, `notify.telegram` |
+| Benachrichtigungsdienste für den Ersteller | leer | Empfänger der Abschluss-Info; leer = Team-Dienste |
+| Bei neuen Tickets benachrichtigen | an | Info an das Team beim Anlegen |
+| Ersteller bei Abschluss benachrichtigen | an | Info, sobald ein Ticket auf „Abgeschlossen“ wechselt |
+| Kritische Tickets ansagen | an | zusätzliche Sprachausgabe |
+| TTS-Entität | – | `tts.*`, z. B. `tts.cloud` oder `tts.piper` |
+| Mediaplayer für Ansagen | leer | eine oder mehrere `media_player.*`-Entitäten |
+| Gesprochener Text | `Kritisches Ticket im Ticketsystem: {title}. Bitte sofort prüfen.` | Platzhalter: `{title}`, `{priority}`, `{author}`, `{id}` |
+
+### Was wann passiert
+
+| Auslöser | Empfänger | Inhalt |
+| --- | --- | --- |
+| Ticket erstellt | Team-Dienste | Titel, Dringlichkeit, Status, Ersteller, ID und Beschreibung (max. 500 Zeichen) |
+| Ticket erstellt mit Dringlichkeit **Kritisch** | zusätzlich die Mediaplayer | gesprochener Text aus dem Template |
+| Status wechselt auf **Abgeschlossen** | Ersteller-Dienste (sonst Team) | Abschluss-Info mit Titel, Ersteller und ID |
+
+Im Formular lässt sich die Benachrichtigung pro Ticket abwählen. Ein so erstelltes
+Ticket (`notify: false`) löst weder Push noch Sprachausgabe aus – nützlich für Tickets,
+die per Automation aus einem bekannten Ereignis entstehen.
+
+### Sprachausgabe
+
+- Mit **TTS-Entität + Mediaplayer** läuft alles über `tts.speak` (Home Assistant Cloud,
+  Piper, Google Translate …).
+- **Ohne TTS-Entität**, aber mit Mediaplayern, nutzt die Integration automatisch
+  `notify.alexa_media` (`data.type: tts`), wenn Alexa Media Player installiert ist.
+- Ist beides nicht vorhanden, bleibt es bei der Text-Benachrichtigung; im Log steht ein
+  einmaliger Hinweis, was fehlt.
+- Unbekannte Platzhalter bleiben im Text stehen, ein syntaktisch kaputtes Template fällt
+  auf den Standardtext zurück.
+
+### Benachrichtigungsdienste finden
+
+Unter **Entwicklerwerkzeuge → Aktionen** nach `notify.` suchen. Typische Kandidaten:
+
+- `notify.persistent_notification` – immer vorhanden, Glocke in der Seitenleiste
+- `notify.mobile_app_<gerät>` – Companion-App, z. B. `notify.mobile_app_pixel_9`
+- `notify.telegram`, `notify.signal`, `notify.pushover` – je nach eingerichteter Integration
+
+Die Auswahl im Optionsdialog liest die vorhandenen `notify`-Dienste direkt aus Home
+Assistant. Verschwindet ein Dienst später, wird er übersprungen und das Log meldet es –
+die übrigen Dienste funktionieren weiter.
+
+---
+
 ## Dashboard-Karten
 
 ### Registrierung
 
 Die Integration liefert die Datei `ticket-system-cards.js` selbst aus und lädt sie als
-JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.0.1`). **Du musst keine Ressource
+JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.0`). **Du musst keine Ressource
 manuell anlegen.**
 
 Nach der Installation:
@@ -228,7 +331,7 @@ kannst du sie als Fallback manuell registrieren:
 
 | Feld | Wert |
 | --- | --- |
-| URL | `/ticket_system/ticket-system-cards.js?v=1.0.1` |
+| URL | `/ticket_system/ticket-system-cards.js?v=1.1.0` |
 | Typ | JavaScript-Modul |
 
 ### Karte: `custom:ticket-submit-card`
@@ -244,6 +347,9 @@ Home-Assistant-Benutzers vorbelegt und kann geändert werden.
 | `show_priority` | bool | `true` | Dringlichkeits-Auswahl anzeigen |
 | `show_description` | bool | `true` | Beschreibungsfeld anzeigen |
 | `allow_author` | bool | `true` | Ersteller-Feld anzeigen |
+| `show_notify` | bool | `true` | Auswahl „Team benachrichtigen“ anzeigen |
+| `notify_default` | bool | `true` | Auswahl standardmäßig aktiv |
+| `notify_label` | string | `Team über dieses Ticket benachrichtigen` | Beschriftung der Auswahl |
 | `button_label` | string | `Ticket absenden` | Button-Text |
 | `success_message` | string | `Ticket wurde erstellt – vielen Dank!` | Erfolgsmeldung |
 
@@ -255,6 +361,9 @@ default_priority: medium
 show_priority: true
 show_description: true
 allow_author: true
+show_notify: true
+notify_default: true
+notify_label: Team über dieses Ticket benachrichtigen
 button_label: Ticket absenden
 success_message: Danke! Dein Ticket wurde erstellt.
 ```
@@ -270,6 +379,8 @@ Pro Ticket stehen je nach Status bereit:
 - **In Bearbeitung** (nur bei `open`)
 - **Abschließen** (bei `open` und `in_progress`)
 - **Wieder öffnen** (bei `closed`)
+- **Benachrichtigen** – schickt eine Info zum Ticket an das Team
+- **Erinnerung** – schickt eine Erinnerung inkl. Wartezeit (nicht bei abgeschlossenen Tickets)
 - **Löschen** (mit Rückfrage)
 
 | Option | Typ | Standard | Bedeutung |
@@ -279,6 +390,7 @@ Pro Ticket stehen je nach Status bereit:
 | `show_closed` | bool | `true` | abgeschlossene Tickets dauerhaft ausblenden, wenn `false` |
 | `show_description` | bool | `true` | Beschreibung in der Liste anzeigen |
 | `allow_status_change` | bool | `true` | Status-Buttons anzeigen |
+| `allow_notify` | bool | `true` | Buttons „Benachrichtigen“ und „Erinnerung“ anzeigen |
 | `allow_delete` | bool | `true` | Löschen-Button anzeigen |
 | `default_status_filter` | `all` \| `open` \| `in_progress` \| `closed` | `all` | Startfilter |
 | `max_items` | number | `0` | Anzahl sichtbarer Tickets (`0` = alle) |
@@ -290,6 +402,7 @@ subtitle: Nach Dringlichkeit sortiert – Kritisch zuerst.
 show_closed: true
 show_description: true
 allow_status_change: true
+allow_notify: true
 allow_delete: true
 default_status_filter: all
 max_items: 0
@@ -351,10 +464,11 @@ Einzufügen über **Dashboard → Stift → Drei-Punkte-Menü → Raw-Konfigurat
 │       ├── config_flow.py         # UI-Einrichtung (eine Instanz)
 │       ├── const.py               # Domäne, Feldwerte, Events
 │       ├── manager.py             # Ticket-CRUD + Persistenz
+│       ├── notifications.py       # Benachrichtigungen, TTS, notify-Service
 │       ├── manifest.json
 │       ├── brand/icon.png         # Icon für Geräte-UI und HACS
 │       ├── sensor.py              # 4 Zähler-Sensoren
-│       ├── services.py            # create / update / set_status / delete
+│       ├── services.py            # create / update / set_status / delete / notify
 │       ├── services.yaml          # Felddefinitionen für die UI
 │       ├── strings.json           # englische Quelltexte
 │       ├── translations/
@@ -397,7 +511,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 2. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
    `home-assistant`, `hacs`, `integration`, `ticket-system`, `lovelace`.
 
-3. Release erstellen (`v1.0.1`) – HACS löst darüber Updates aus und zeigt die Version an.
+3. Release erstellen (`v1.1.0`) – HACS löst darüber Updates aus und zeigt die Version an.
    Tag und Version in `manifest.json` sollten übereinstimmen.
 
 4. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
@@ -419,6 +533,9 @@ Automatisierungen sehen dieselben Änderungen sofort.
 | Tickets weg nach Neustart | `.storage/ticket_system.tickets` muss im Konfigurationsverzeichnis liegen und beschreibbar sein. |
 | Dienst-Aufruf meldet „Unbekannte Dringlichkeit“ | Erlaubt sind `low/medium/high/critical` bzw. `Niedrig/Mittel/Hoch/Kritisch`. |
 | Nach einem Update alte Kartendarstellung | `?v=`-Parameter der Ressource bzw. Browser-Cache leeren. |
+| Keine Benachrichtigung bei neuen Tickets | Optionen der Integration prüfen (Team-Dienste, „Bei neuen Tickets benachrichtigen“) und ob das Ticket mit abgewählter Benachrichtigung erstellt wurde (`notify: false`). |
+| Kritisches Ticket wird nicht angesagt | Ohne TTS-Entität braucht es Alexa Media Player und mindestens einen Mediaplayer; siehe einmalige Warnung im Log. |
+| „Es konnte keine Benachrichtigung gesendet werden“ | In den Optionen steht kein vorhandener `notify`-Dienst. Unter Entwicklerwerkzeuge → Aktionen prüfen, welcher Dienst existiert. |
 
 Logs: **Einstellungen → System → Protokolle**, Filter `ticket_system`.
 

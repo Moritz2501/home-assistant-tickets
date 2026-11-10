@@ -13,6 +13,27 @@
       "single_instance_allowed": "Das Ticketsystem ist bereits eingerichtet. Es kann nur eine Instanz geben."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Benachrichtigungen",
+        "description": "Lege fest, wer über Tickets informiert wird und ob kritische Tickets zusätzlich angesagt werden.",
+        "data": {
+          "notify_services": "Benachrichtigungsdienste für das Team",
+          "creator_notify_services": "Benachrichtigungsdienste für den Ersteller (leer = Team-Dienste)",
+          "notify_on_create": "Bei neuen Tickets benachrichtigen",
+          "notify_on_close": "Ersteller bei Abschluss benachrichtigen",
+          "notify_critical_tts": "Kritische Tickets ansagen",
+          "tts_entity": "TTS-Entität",
+          "tts_media_players": "Mediaplayer für Ansagen",
+          "tts_message": "Gesprochener Text"
+        },
+        "data_description": {
+          "tts_message": "Platzhalter: {title}, {priority}, {author}, {id}"
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "open_tickets": {
@@ -53,6 +74,10 @@
         "author": {
           "name": "Ersteller",
           "description": "Person, die das Ticket erstellt."
+        },
+        "notify": {
+          "name": "Benachrichtigungen senden",
+          "description": "Ob das Team (und bei kritischen Tickets die Mediaplayer) über dieses Ticket informiert wird."
         }
       }
     },
@@ -102,6 +127,36 @@
         "ticket_id": {
           "name": "Ticket-ID",
           "description": "ID des zu löschenden Tickets."
+        }
+      }
+    },
+    "notify": {
+      "name": "Über Ticket benachrichtigen",
+      "description": "Sendet eine Information oder Erinnerung zu einem bestehenden Ticket.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket-ID",
+          "description": "ID des Tickets, um das es geht."
+        },
+        "kind": {
+          "name": "Art",
+          "description": "Information oder Erinnerung."
+        },
+        "target": {
+          "name": "Empfänger",
+          "description": "Team, Ersteller oder beides."
+        },
+        "message": {
+          "name": "Nachricht",
+          "description": "Eigener Text. Leer verwendet den automatisch erzeugten Text."
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Eigener Titel der Benachrichtigung."
+        },
+        "notify_service": {
+          "name": "Benachrichtigungsdienst",
+          "description": "Nur über diesen Dienst senden, z. B. mobile_app_pixel."
         }
       }
     }

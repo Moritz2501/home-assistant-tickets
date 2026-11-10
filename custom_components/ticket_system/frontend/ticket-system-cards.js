@@ -16,7 +16,7 @@
     return; // bereits geladen
   }
 
-  const VERSION = "1.0.1";
+  const VERSION = "1.1.0";
   const DOMAIN = "ticket_system";
 
   const PRIORITIES = ["low", "medium", "high", "critical"];
@@ -55,6 +55,9 @@
     allow_author: true,
     show_priority: true,
     show_description: true,
+    show_notify: true,
+    notify_default: true,
+    notify_label: "Team über dieses Ticket benachrichtigen",
     button_label: "Ticket absenden",
     success_message: "Ticket wurde erstellt – vielen Dank!",
   };
@@ -65,6 +68,7 @@
     show_closed: true,
     show_description: true,
     allow_status_change: true,
+    allow_notify: true,
     allow_delete: true,
     default_status_filter: "all",
     max_items: 0,
@@ -214,6 +218,16 @@
 
     textarea.input { min-height: 86px; resize: vertical; }
     select.input { cursor: pointer; }
+
+    .check {
+      align-items: center;
+      color: var(--secondary-text-color);
+      cursor: pointer;
+      display: flex;
+      font-size: 13px;
+      gap: 8px;
+    }
+    .check input { accent-color: var(--primary-color); height: 18px; width: 18px; }
 
     .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -528,6 +542,17 @@
               }
             </div>
 
+            ${
+              config.show_notify
+                ? `<label class="check">
+                     <input type="checkbox" name="notify"${
+                       config.notify_default ? " checked" : ""
+                     }>
+                     <span>${esc(config.notify_label)}</span>
+                   </label>`
+                : ""
+            }
+
             <div class="actions">
               <button class="btn primary" type="submit">${esc(config.button_label)}</button>
               <button class="btn ghost" type="reset">Zurücksetzen</button>
@@ -560,6 +585,8 @@
       if (author) author.value = this._defaultAuthor();
       const priority = this._field("priority");
       if (priority) priority.value = this._config.default_priority || "medium";
+      const notify = this._field("notify");
+      if (notify) notify.checked = Boolean(this._config.notify_default);
     }
 
     _showMessage(kind, text) {
@@ -589,6 +616,10 @@
       const description = this._value("description").trim();
       const priority = this._value("priority") || "medium";
       const author = (this._value("author") || this._defaultAuthor()).trim();
+      const notifyField = this._field("notify");
+      const notify = notifyField
+        ? Boolean(notifyField.checked)
+        : Boolean(this._config.show_notify ? this._config.notify_default : true);
 
       if (!title) {
         this._showMessage("error", "Bitte gib einen Titel für das Ticket ein.");
@@ -611,6 +642,7 @@
             priority,
             status: "open",
             author: author || "Unbekannt",
+            notify,
           },
           undefined,
           false
@@ -958,6 +990,20 @@
           )}" ${buttonDisabled(busy)}>Wieder öffnen</button>`
         );
       }
+      if (config.allow_notify) {
+        actions.push(
+          `<button class="btn small ghost" data-action="notify" data-id="${esc(
+            ticket.id
+          )}" ${buttonDisabled(busy)}>Benachrichtigen</button>`
+        );
+        if (status !== "closed") {
+          actions.push(
+            `<button class="btn small ghost" data-action="remind" data-id="${esc(
+              ticket.id
+            )}" ${buttonDisabled(busy)}>Erinnerung</button>`
+          );
+        }
+      }
       if (config.allow_delete) {
         actions.push(
           `<button class="btn small danger" data-action="delete" data-id="${esc(
@@ -1046,6 +1092,24 @@
                   updated_at: new Date().toISOString(),
                 })
               : ticket
+          );
+        } else if (action === "notify" || action === "remind") {
+          const response = await this._hass.callService(
+            DOMAIN,
+            "notify",
+            {
+              ticket_id: id,
+              kind: action === "remind" ? "reminder" : "info",
+            },
+            undefined,
+            true
+          );
+          const sent = (response && response.sent) || [];
+          this._showToast(
+            "success",
+            sent.length
+              ? `Benachrichtigung gesendet (${sent.join(", ")}).`
+              : "Benachrichtigung gesendet."
           );
         }
       } catch (err) {
@@ -1224,6 +1288,21 @@
         { key: "show_priority", label: "Dringlichkeit anzeigen", type: "boolean" },
         { key: "show_description", label: "Beschreibung anzeigen", type: "boolean" },
         { key: "allow_author", label: "Ersteller-Feld anzeigen", type: "boolean" },
+        {
+          key: "show_notify",
+          label: "Benachrichtigungs-Auswahl anzeigen",
+          type: "boolean",
+        },
+        {
+          key: "notify_default",
+          label: "Benachrichtigung standardmäßig aktiv",
+          type: "boolean",
+        },
+        {
+          key: "notify_label",
+          label: "Text der Benachrichtigungs-Auswahl",
+          type: "text",
+        },
         { key: "button_label", label: "Beschriftung des Buttons", type: "text" },
         { key: "success_message", label: "Erfolgsmeldung", type: "text" },
       ];
@@ -1242,6 +1321,11 @@
         { key: "show_closed", label: "Abgeschlossene Tickets anzeigen", type: "boolean" },
         { key: "show_description", label: "Beschreibung anzeigen", type: "boolean" },
         { key: "allow_status_change", label: "Statusänderung erlauben", type: "boolean" },
+        {
+          key: "allow_notify",
+          label: "Benachrichtigen/Erinnern erlauben",
+          type: "boolean",
+        },
         { key: "allow_delete", label: "Löschen erlauben", type: "boolean" },
         {
           key: "default_status_filter",

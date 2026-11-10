@@ -19,11 +19,20 @@ from homeassistant.helpers import config_validation as cv
 from .const import (
     ATTR_AUTHOR,
     ATTR_DESCRIPTION,
+    ATTR_KIND,
+    ATTR_MESSAGE,
+    ATTR_NOTIFY,
+    ATTR_NOTIFY_SERVICE,
     ATTR_PRIORITY,
     ATTR_STATUS,
+    ATTR_TARGET,
     ATTR_TICKET_ID,
     ATTR_TITLE,
     DOMAIN,
+    NOTIFY_KIND_INFO,
+    NOTIFY_KINDS,
+    NOTIFY_TARGET_ADMINS,
+    NOTIFY_TARGETS,
     PRIORITIES,
     PRIORITY_CRITICAL,
     PRIORITY_HIGH,
@@ -31,6 +40,7 @@ from .const import (
     PRIORITY_MEDIUM,
     SERVICE_CREATE,
     SERVICE_DELETE,
+    SERVICE_NOTIFY,
     SERVICE_SET_STATUS,
     SERVICE_UPDATE,
     STATUS_CLOSED,
@@ -39,6 +49,7 @@ from .const import (
     STATUSES,
 )
 from .manager import TicketManager, get_manager
+from .notifications import TicketNotifier, get_notifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -120,6 +131,7 @@ _CREATE_SCHEMA = vol.Schema(
             cv.string, _as_status
         ),
         vol.Optional(ATTR_AUTHOR, default=""): cv.string,
+        vol.Optional(ATTR_NOTIFY, default=True): cv.boolean,
     }
 )
 
@@ -145,6 +157,19 @@ _SET_STATUS_SCHEMA = vol.Schema(
 
 _DELETE_SCHEMA = vol.Schema({vol.Required(ATTR_TICKET_ID): cv.string})
 
+_NOTIFY_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_TICKET_ID): cv.string,
+        vol.Optional(ATTR_KIND, default=NOTIFY_KIND_INFO): vol.In(NOTIFY_KINDS),
+        vol.Optional(ATTR_TARGET, default=NOTIFY_TARGET_ADMINS): vol.In(
+            NOTIFY_TARGETS
+        ),
+        vol.Optional(ATTR_MESSAGE): cv.string,
+        vol.Optional(ATTR_TITLE): cv.string,
+        vol.Optional(ATTR_NOTIFY_SERVICE): cv.string,
+    }
+)
+
 
 def _require_manager(hass: HomeAssistant) -> TicketManager:
     """Manager holen oder einen verständlichen Fehler werfen."""
@@ -155,6 +180,17 @@ def _require_manager(hass: HomeAssistant) -> TicketManager:
             "Bitte die Integration unter Einstellungen > Geräte & Dienste hinzufügen."
         )
     return manager
+
+
+def _require_notifier(hass: HomeAssistant) -> TicketNotifier:
+    """Notifier holen oder einen verständlichen Fehler werfen."""
+    notifier = get_notifier(hass)
+    if notifier is None:
+        raise HomeAssistantError(
+            "Die Benachrichtigungen des Ticketsystems sind nicht verfügbar. "
+            "Bitte die Integration neu laden."
+        )
+    return notifier
 
 
 async def async_register_services(hass: HomeAssistant) -> None:
@@ -170,6 +206,7 @@ async def async_register_services(hass: HomeAssistant) -> None:
             priority=call.data.get(ATTR_PRIORITY, PRIORITY_MEDIUM),
             status=call.data.get(ATTR_STATUS, STATUS_OPEN),
             author=call.data.get(ATTR_AUTHOR, ""),
+            notify=call.data.get(ATTR_NOTIFY, True),
         )
         return {"ticket_id": ticket["id"], "ticket": ticket}
 
@@ -213,6 +250,34 @@ async def async_register_services(hass: HomeAssistant) -> None:
             ) from err
         return {"ticket_id": ticket_id, "deleted": True, "ticket": ticket}
 
+    async def async_handle_notify(call: ServiceCall) -> ServiceResponse:
+        notifier = _require_notifier(hass)
+        manager = _require_manager(hass)
+        ticket_id = call.data[ATTR_TICKET_ID]
+        ticket = manager.async_get(ticket_id)
+        if ticket is None:
+            raise ServiceValidationError(
+                f"Ticket '{ticket_id}' wurde nicht gefunden."
+            )
+
+        result = await notifier.async_notify_ticket(
+            ticket,
+            kind=call.data.get(ATTR_KIND, NOTIFY_KIND_INFO),
+            target=call.data.get(ATTR_TARGET, NOTIFY_TARGET_ADMINS),
+            message=call.data.get(ATTR_MESSAGE),
+            title=call.data.get(ATTR_TITLE),
+            service=call.data.get(ATTR_NOTIFY_SERVICE),
+        )
+
+        if not result["sent"]:
+            raise HomeAssistantError(
+                "Es konnte keine Benachrichtigung gesendet werden. Bitte in den "
+                "Optionen der Integration mindestens einen vorhandenen "
+                "Benachrichtigungsdienst auswählen."
+            )
+
+        return result
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_CREATE,
@@ -241,6 +306,13 @@ async def async_register_services(hass: HomeAssistant) -> None:
         schema=_DELETE_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NOTIFY,
+        async_handle_notify,
+        schema=_NOTIFY_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
 
     _LOGGER.debug("Ticketsystem: Services registriert")
 
@@ -252,6 +324,7 @@ async def async_unregister_services(hass: HomeAssistant) -> None:
         SERVICE_UPDATE,
         SERVICE_SET_STATUS,
         SERVICE_DELETE,
+        SERVICE_NOTIFY,
     ):
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)

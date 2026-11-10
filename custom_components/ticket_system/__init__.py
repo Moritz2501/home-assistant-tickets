@@ -13,6 +13,7 @@ from homeassistant.helpers.typing import ConfigType
 from .const import (
     DATA_FRONTEND_REGISTERED,
     DATA_MANAGER,
+    DATA_NOTIFIER,
     DOMAIN,
     FRONTEND_DIR,
     FRONTEND_SCRIPT,
@@ -21,6 +22,7 @@ from .const import (
     VERSION,
 )
 from .manager import TicketManager
+from .notifications import TicketNotifier
 from .services import async_register_services, async_unregister_services
 from .websocket_api import async_register_websocket_api
 
@@ -44,22 +46,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     manager = TicketManager(hass)
     await manager.async_load()
 
-    hass.data.setdefault(DOMAIN, {})[DATA_MANAGER] = manager
+    notifier = TicketNotifier(hass, entry)
+    notifier.async_start()
+
+    data = hass.data.setdefault(DOMAIN, {})
+    data[DATA_MANAGER] = manager
+    data[DATA_NOTIFIER] = notifier
 
     await _async_register_frontend(hass)
     async_register_websocket_api(hass)
     await async_register_services(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Änderungen an den Benachrichtigungs-Optionen sofort übernehmen.
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+
     _LOGGER.debug("Ticketsystem eingerichtet (%s)", entry.title)
     return True
+
+
+async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Optionen wurden geändert – Integration neu laden."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Integration entladen (z. B. bei Neustart der Integration)."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        hass.data.get(DOMAIN, {}).pop(DATA_MANAGER, None)
+        data = hass.data.get(DOMAIN, {})
+        notifier = data.pop(DATA_NOTIFIER, None)
+        if notifier is not None:
+            notifier.async_stop()
+        data.pop(DATA_MANAGER, None)
     return unloaded
 
 

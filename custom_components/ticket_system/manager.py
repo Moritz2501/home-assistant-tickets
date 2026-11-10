@@ -15,6 +15,7 @@ from homeassistant.helpers.storage import Store
 from .const import (
     ATTR_AUTHOR,
     ATTR_DESCRIPTION,
+    ATTR_NOTIFY,
     ATTR_PRIORITY,
     ATTR_STATUS,
     ATTR_TITLE,
@@ -142,6 +143,7 @@ class TicketManager:
         priority: str = PRIORITY_MEDIUM,
         status: str = STATUS_OPEN,
         author: str = "",
+        notify: bool = True,
     ) -> dict[str, Any]:
         """Legt ein neues Ticket an."""
         async with self._lock:
@@ -153,6 +155,7 @@ class TicketManager:
                 ATTR_PRIORITY: priority if priority in PRIORITIES else PRIORITY_MEDIUM,
                 ATTR_STATUS: status if status in STATUSES else STATUS_OPEN,
                 ATTR_AUTHOR: _clean(author, 100) or "Unbekannt",
+                ATTR_NOTIFY: bool(notify),
                 "created_at": _iso(now),
                 "updated_at": _iso(now),
                 "closed_at": _iso(now) if status == STATUS_CLOSED else None,
@@ -178,6 +181,8 @@ class TicketManager:
             if ticket is None:
                 raise KeyError(ticket_id)
 
+            before = dict(ticket)
+
             for field in TICKET_FIELDS:
                 value = changes.get(field)
                 if value is None:
@@ -201,9 +206,16 @@ class TicketManager:
                 )
 
             result = dict(ticket)
+            changed = sorted(
+                field
+                for field in TICKET_FIELDS
+                if before.get(field) != result.get(field)
+            )
             await self._async_commit()
 
-        self.hass.bus.async_fire(EVENT_TICKET_UPDATED, {"ticket": result})
+        self.hass.bus.async_fire(
+            EVENT_TICKET_UPDATED, {"ticket": result, "changes": changed}
+        )
         return result
 
     async def async_set_status(
@@ -255,6 +267,7 @@ class TicketManager:
             ATTR_PRIORITY: priority,
             ATTR_STATUS: status,
             ATTR_AUTHOR: str(raw.get(ATTR_AUTHOR) or "Unbekannt"),
+            ATTR_NOTIFY: bool(raw.get(ATTR_NOTIFY, True)),
             "created_at": created_at,
             "updated_at": str(raw.get("updated_at") or created_at),
             "closed_at": raw.get("closed_at") or None,

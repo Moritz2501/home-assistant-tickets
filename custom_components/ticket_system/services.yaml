@@ -39,6 +39,10 @@ create:
       example: "Max Mustermann"
       selector:
         text:
+    notify:
+      default: true
+      selector:
+        boolean:
 
 update:
   fields:
@@ -104,5 +108,46 @@ delete:
     ticket_id:
       required: true
       example: "20261110-114800-a1b2c3"
+      selector:
+        text:
+
+notify:
+  fields:
+    ticket_id:
+      required: true
+      example: "20261110-114800-a1b2c3"
+      selector:
+        text:
+    kind:
+      default: "info"
+      selector:
+        select:
+          options:
+            - value: "info"
+              label: "Information"
+            - value: "reminder"
+              label: "Erinnerung"
+    target:
+      default: "admins"
+      selector:
+        select:
+          options:
+            - value: "admins"
+              label: "Team (Admin-Dienste)"
+            - value: "creator"
+              label: "Ersteller"
+            - value: "all"
+              label: "Team und Ersteller"
+    message:
+      example: "Bitte das Ticket bis heute Abend prüfen."
+      selector:
+        text:
+          multiline: true
+    title:
+      example: "Erinnerung: Heizung Wohnzimmer"
+      selector:
+        text:
+    notify_service:
+      example: "mobile_app_pixel"
       selector:
         text:
