@@ -214,7 +214,7 @@ Weitere Beispiele: [`examples/automations.yaml`](examples/automations.yaml).
 ### Registrierung
 
 Die Integration liefert die Datei `ticket-system-cards.js` selbst aus und lädt sie als
-JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.0.0`). **Du musst keine Ressource
+JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.0.1`). **Du musst keine Ressource
 manuell anlegen.**
 
 Nach der Installation:
@@ -228,7 +228,7 @@ kannst du sie als Fallback manuell registrieren:
 
 | Feld | Wert |
 | --- | --- |
-| URL | `/ticket_system/ticket-system-cards.js?v=1.0.0` |
+| URL | `/ticket_system/ticket-system-cards.js?v=1.0.1` |
 | Typ | JavaScript-Modul |
 
 ### Karte: `custom:ticket-submit-card`
@@ -397,7 +397,8 @@ Automatisierungen sehen dieselben Änderungen sofort.
 2. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
    `home-assistant`, `hacs`, `integration`, `ticket-system`, `lovelace`.
 
-3. Release erstellen (`v1.0.0`) – HACS löst darüber Updates aus und zeigt die Version an.
+3. Release erstellen (`v1.0.1`) – HACS löst darüber Updates aus und zeigt die Version an.
+   Tag und Version in `manifest.json` sollten übereinstimmen.
 
 4. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
    `hassfest` und die HACS-Kriterien. Fehlermeldungen dort sind ernst zu nehmen, sie
