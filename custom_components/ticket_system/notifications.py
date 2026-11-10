@@ -56,48 +56,110 @@ NOTIFY_SEND_MESSAGE: Final = "send_message"
 ALEXA_NOTIFY_SERVICE: Final = "alexa_media"
 TTS_DOMAIN: Final = "tts"
 TTS_SERVICE: Final = "speak"
-ALEXA_NOTIFY_SUFFIXES: Final = ("_announce", "_speak")
+# Die Entitäts-IDs der Alexa-Devices-Notify-Entitäten entstehen aus den
+# übersetzten Namen (englisch ``_announce``/``_speak``, deutsch u. a.
+# ``_durchsagen``/``_sprechen``), deshalb mehrere Varianten plus der
+# sprachunabhängige ``translation_key`` aus der Entity-Registry.
+ALEXA_NOTIFY_SUFFIXES: Final = (
+    "_announce",
+    "_speak",
+    "_durchsagen",
+    "_sprechen",
+    "_ansage",
+    "_ankuendigung",
+    "_ankündigung",
+)
+ALEXA_NOTIFY_KEYS: Final = ("announce", "speak")
+ALEXA_DEVICES_DOMAIN: Final = "alexa_devices"
 
 MAX_DESCRIPTION_IN_MESSAGE = 500
 
 
-def _alexa_notify_entity(hass: HomeAssistant, player: str) -> str | None:
-    """Liefert die Speak-/Announce-Entität, die zu einem Alexa-Player gehört.
-
-    Die Integration ``alexa_devices`` legt pro Gerät ``notify.<gerät>_speak`` und
-    ``notify.<gerät>_announce`` an. Ansagen laufen dort über ``notify.send_message``,
-    während ``media_player.play_media`` (der Weg von ``tts.speak``) bei Echo-Geräten
-    mit "music is not available as a music provider" abbricht.
-    """
-    base = player.split(".", 1)[1] if "." in player else player
-    states = getattr(hass, "states", None)
-    if states is not None:
-        for suffix in ALEXA_NOTIFY_SUFFIXES:
-            entity_id = f"{NOTIFY_DOMAIN}.{base}{suffix}"
-            if states.get(entity_id) is not None:
-                return entity_id
-
-    # Umbenannte Entitäten: über das Gerät des Mediaplayers suchen.
+def _registry_entry(hass: HomeAssistant, entity_id: str) -> Any:
+    """Registry-Eintrag einer Entität oder ``None`` (Registry ist optional)."""
     try:
         from homeassistant.helpers import entity_registry as er
 
-        registry = er.async_get(hass)
-        device_id = getattr(registry.async_get(player), "device_id", None)
-        if not device_id:
-            return None
-        candidates = sorted(
-            item.entity_id
-            for item in er.async_entries_for_device(registry, device_id)
-            if item.domain == NOTIFY_DOMAIN and not getattr(item, "disabled_by", None)
-        )
+        return er.async_get(hass).async_get(entity_id)
     except Exception:  # noqa: BLE001 - Registry ist nur eine Zusatzquelle
         return None
 
-    for suffix in ALEXA_NOTIFY_SUFFIXES:
-        for entity_id in candidates:
-            if entity_id.endswith(suffix):
-                return entity_id
-    return None
+
+def _alexa_notify_entities(hass: HomeAssistant, player: str) -> list[str]:
+    """Liefert Speak-/Announce-Entitäten, die zu einem Alexa-Player gehören.
+
+    Die Integration ``alexa_devices`` legt pro Gerät Speak- und Announce-Entitäten
+    an (``notify.<gerät>_speak``/``_announce``, in übersetzten Installationen
+    z. B. ``notify.moritz_sprechen``). Ansagen laufen dort über
+    ``notify.send_message``, während ``media_player.play_media`` (der Weg von
+    ``tts.speak``) bei Echo-Geräten mit "music is not available as a music
+    provider" abbricht.
+
+    Announce steht vor Speak: es meldet sich mit Signalton, das ist für
+    kritische Tickets deutlicher.
+    """
+    base = player.split(".", 1)[1] if "." in player else player
+    prefix = f"{NOTIFY_DOMAIN}.{base}"
+    states = getattr(hass, "states", None)
+    found: list[str] = []
+
+    def _add(entity_id: str | None) -> None:
+        if entity_id and entity_id not in found:
+            found.append(entity_id)
+
+    # 1) Erwartete Namen
+    if states is not None:
+        for suffix in ALEXA_NOTIFY_SUFFIXES:
+            entity_id = f"{prefix}{suffix}"
+            if states.get(entity_id) is not None:
+                _add(entity_id)
+
+    # 2) Gerät aus der Registry: Namen sind lokalisiert, der translation_key nicht
+    entry = _registry_entry(hass, player)
+    device_id = getattr(entry, "device_id", None)
+    if device_id:
+        try:
+            from homeassistant.helpers import entity_registry as er
+
+            siblings = [
+                item
+                for item in er.async_entries_for_device(er.async_get(hass), device_id)
+                if item.domain == NOTIFY_DOMAIN
+                and not getattr(item, "disabled_by", None)
+            ]
+        except Exception:  # noqa: BLE001
+            siblings = []
+        for key in ALEXA_NOTIFY_KEYS:
+            for item in siblings:
+                if getattr(item, "translation_key", None) == key:
+                    _add(item.entity_id)
+        if not found and len(siblings) == 1:
+            _add(siblings[0].entity_id)
+        for suffix in ALEXA_NOTIFY_SUFFIXES:
+            for item in siblings:
+                if item.entity_id.endswith(suffix):
+                    _add(item.entity_id)
+
+    # 3) Notfall: Notify-Entitäten, deren ID mit dem Gerätenamen beginnt
+    if not found and states is not None:
+        try:
+            entity_ids = states.async_entity_ids(NOTIFY_DOMAIN)
+        except Exception:  # noqa: BLE001
+            entity_ids = []
+        for entity_id in entity_ids:
+            if entity_id.startswith(f"{prefix}_") and entity_id.endswith(
+                ALEXA_NOTIFY_SUFFIXES
+            ):
+                _add(entity_id)
+
+    return found
+
+
+def _is_alexa_player(hass: HomeAssistant, player: str) -> bool:
+    """True, wenn der Player von der Integration ``alexa_devices`` stammt."""
+    entry = _registry_entry(hass, player)
+    platform = getattr(entry, "platform", None)
+    return platform == ALEXA_DEVICES_DOMAIN
 
 
 def _alexa_media_service(hass: HomeAssistant) -> str | None:
@@ -383,18 +445,32 @@ class TicketNotifier:
 
         for player in players:
             errors: list[str] = []
+            handled = False
 
             # 1) Alexa-Geräte (Integration "Alexa Devices"): Speak-/Announce-Entität
             #    des Geräts. Deren Mediaplayer nimmt keine gestreamten Dateien an.
-            notify_entity = _alexa_notify_entity(self.hass, player)
-            if notify_entity is not None:
-                err = await self._async_notify_entity(notify_entity, text)
+            notify_entities = _alexa_notify_entities(self.hass, player)
+            for entity_id in notify_entities:
+                err = await self._async_notify_entity(entity_id, text)
                 if err is None:
-                    continue
-                errors.append(f"{notify_entity}: {err}")
+                    handled = True
+                    break
+                errors.append(f"{entity_id}: {err}")
+            if handled:
+                continue
+
+            # Echo-Geräte lehnen die von tts.speak gestreamte Audiodatei ab
+            # ("music is not available as a music provider") – dort wird der Weg
+            # gar nicht erst versucht, sonst stünde der Fehler wieder im Log.
+            echo = bool(notify_entities) or _is_alexa_player(self.hass, player)
+            if echo and not notify_entities:
+                errors.append(
+                    "keine Speak-/Announce-Entität am Gerät gefunden "
+                    "(in der Alexa-App Durchsagen erlauben, Nicht-stören aus)"
+                )
 
             # 2) Klassischer Weg über tts.speak (Cast, Sonos, ...)
-            if tts_available:
+            if tts_available and not echo:
                 try:
                     await self.hass.services.async_call(
                         TTS_DOMAIN,
@@ -426,7 +502,7 @@ class TicketNotifier:
                 )
 
         if not tts_configured and alexa_service is None:
-            if not any(_alexa_notify_entity(self.hass, player) for player in players):
+            if not any(_alexa_notify_entities(self.hass, player) for player in players):
                 self._warn_once(
                     "tts-missing",
                     "Ticketsystem: Für die Sprachausgabe kritischer Tickets fehlt "

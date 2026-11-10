@@ -293,7 +293,9 @@ die per Automation aus einem bekannten Ereignis entstehen.
   Piper, Google Translate …).
 - Gehört der Mediaplayer zu einem **Echo** (Integration „Alexa Devices“), wird direkt
   dessen `notify.<gerät>_announce`- bzw. `_speak`-Entität über `notify.send_message`
-  angesagt. `tts.speak` wird dort gar nicht erst versucht, weil Echo-Geräte die
+  angesagt – in übersetzten Installationen heißen die Entitäten z. B.
+  `notify.moritz_durchsagen` und `notify.moritz_sprechen`, beides wird erkannt.
+  `tts.speak` wird dort gar nicht erst versucht, weil Echo-Geräte die
   gestreamte Audiodatei mit `music is not available as a music provider` ablehnen.
 - Alternativ bzw. als Rückfallebene nutzt die Integration **Alexa Media Player**
   (`notify.alexa_media`, je nach Version auch `notify.alexa_media_<konto>` mit
@@ -322,7 +324,7 @@ die übrigen Dienste funktionieren weiter.
 ### Registrierung
 
 Die Integration liefert die Datei `ticket-system-cards.js` selbst aus und lädt sie als
-JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.5`). **Du musst keine Ressource
+JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.6`). **Du musst keine Ressource
 manuell anlegen.**
 
 Ab Home Assistant 2026.8 ersetzt das Frontend `window.customElements` beim Start durch
@@ -342,7 +344,7 @@ kannst du sie als Fallback manuell registrieren:
 
 | Feld | Wert |
 | --- | --- |
-| URL | `/ticket_system/ticket-system-cards.js?v=1.1.5` |
+| URL | `/ticket_system/ticket-system-cards.js?v=1.1.6` |
 | Typ | JavaScript-Modul |
 
 ### Karte: `custom:ticket-submit-card`
@@ -522,7 +524,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 2. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
    `home-assistant`, `hacs`, `integration`, `ticket-system`, `lovelace`.
 
-3. Release erstellen (`v1.1.5`) – HACS löst darüber Updates aus und zeigt die Version an.
+3. Release erstellen (`v1.1.6`) – HACS löst darüber Updates aus und zeigt die Version an.
    Tag und Version in `manifest.json` sollten übereinstimmen.
 
 4. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
@@ -547,7 +549,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 | Nach einem Update alte Kartendarstellung | `?v=`-Parameter der Ressource bzw. Browser-Cache leeren. |
 | Keine Benachrichtigung bei neuen Tickets | Optionen der Integration prüfen (Team-Dienste, „Bei neuen Tickets benachrichtigen“) und ob das Ticket mit abgewählter Benachrichtigung erstellt wurde (`notify: false`). |
 | Kritisches Ticket wird nicht angesagt | Es braucht mindestens einen Mediaplayer und entweder eine TTS-Entität (`tts.*`) oder ein Alexa-Gerät mit Speak-/Announce-Entität („Alexa Devices“) bzw. Alexa Media Player; siehe einmalige Warnung im Log. |
-| Log: „Sprachausgabe auf media_player… fehlgeschlagen: … music is not available as a music provider“ | Der Zielplayer ist ein Echo-Gerät. `tts.speak` schickt eine Audiodatei an den Player, und Echo-Geräte lehnen das über `aioamazondevices` mit dieser Meldung ab. Ab **1.1.5** erkennt die Integration den Player und sagt direkt über seine Speak-/Announce-Entität an (Alexa Devices), sonst über Alexa Media Player; `tts.speak` wird für Echo-Geräte übersprungen. Steht in der Warnung zusätzlich ein fehlgeschlagener Alexa-Weg, sind die Geräte offline oder Ansagen in der Alexa-App deaktiviert. |
+| Log: „Sprachausgabe auf media_player… fehlgeschlagen: … music is not available as a music provider“ | Der Zielplayer ist ein Echo-Gerät. `tts.speak` schickt eine Audiodatei an den Player, und Echo-Geräte lehnen das über `aioamazondevices` mit dieser Meldung ab. Ab **1.1.6** erkennt die Integration den Player und sagt direkt über seine Speak-/Announce-Entität an (Alexa Devices), sonst über Alexa Media Player; `tts.speak` wird für Echo-Geräte übersprungen. Steht in der Warnung zusätzlich ein fehlgeschlagener Alexa-Weg, sind die Geräte offline oder Ansagen in der Alexa-App deaktiviert. |
 | „Es konnte keine Benachrichtigung gesendet werden“ | In den Optionen steht kein vorhandener `notify`-Dienst. Unter Entwicklerwerkzeuge → Aktionen prüfen, welcher Dienst existiert. |
 
 Logs: **Einstellungen → System → Protokolle**, Filter `ticket_system`.
