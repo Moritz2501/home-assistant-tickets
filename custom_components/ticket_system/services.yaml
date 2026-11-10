@@ -1,0 +1,110 @@
+create:
+  fields:
+    title:
+      required: true
+      example: "Heizung im Wohnzimmer defekt"
+      selector:
+        text:
+          max_length: 200
+    description:
+      example: "Seit heute Morgen wird die Heizung nicht mehr warm."
+      selector:
+        text:
+          multiline: true
+    priority:
+      example: "high"
+      default: "medium"
+      selector:
+        select:
+          options:
+            - value: "low"
+              label: "Niedrig"
+            - value: "medium"
+              label: "Mittel"
+            - value: "high"
+              label: "Hoch"
+            - value: "critical"
+              label: "Kritisch"
+    status:
+      default: "open"
+      selector:
+        select:
+          options:
+            - value: "open"
+              label: "Offen"
+            - value: "in_progress"
+              label: "In Bearbeitung"
+            - value: "closed"
+              label: "Abgeschlossen"
+    author:
+      example: "Max Mustermann"
+      selector:
+        text:
+
+update:
+  fields:
+    ticket_id:
+      required: true
+      example: "20261110-114800-a1b2c3"
+      selector:
+        text:
+    title:
+      selector:
+        text:
+          max_length: 200
+    description:
+      selector:
+        text:
+          multiline: true
+    priority:
+      selector:
+        select:
+          options:
+            - value: "low"
+              label: "Niedrig"
+            - value: "medium"
+              label: "Mittel"
+            - value: "high"
+              label: "Hoch"
+            - value: "critical"
+              label: "Kritisch"
+    status:
+      selector:
+        select:
+          options:
+            - value: "open"
+              label: "Offen"
+            - value: "in_progress"
+              label: "In Bearbeitung"
+            - value: "closed"
+              label: "Abgeschlossen"
+    author:
+      selector:
+        text:
+
+set_status:
+  fields:
+    ticket_id:
+      required: true
+      example: "20261110-114800-a1b2c3"
+      selector:
+        text:
+    status:
+      required: true
+      selector:
+        select:
+          options:
+            - value: "open"
+              label: "Offen"
+            - value: "in_progress"
+              label: "In Bearbeitung"
+            - value: "closed"
+              label: "Abgeschlossen"
+
+delete:
+  fields:
+    ticket_id:
+      required: true
+      example: "20261110-114800-a1b2c3"
+      selector:
+        text:

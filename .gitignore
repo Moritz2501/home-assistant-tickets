@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+env/
+
+# Tests / Linting
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Home Assistant Laufzeitdaten (falls das Repo als komplettes config-Verzeichnis genutzt wird)
+.storage/
+home-assistant.log
+home-assistant_v2.db
+home-assistant_v2.db-*
+*.db
+*.db-shm
+*.db-wal
+tts/
+deps/
+backups/
+
+# Secrets
+.env
+.env.*
+secrets.yaml
+*.pem
+*.key
+
+# Editoren / Betriebssystem
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node (nur falls lokal Tooling ergänzt wird)
+node_modules/
+package-lock.json
+
+# Agent-/Tooling-Ordner
+.freebuff/

@@ -1,0 +1,67 @@
+# ---------------------------------------------------------------------------
+# Beispiel-Dashboard für das Ticketsystem
+#
+# Verwendung:
+#   Einstellungen > Dashboards > Dashboard hinzufügen > "Von Grund auf"
+#   > Dashboard öffnen > Stift-Symbol > drei Punkte > "Raw-Konfiguration
+#   bearbeiten" > diesen Inhalt einfügen.
+#
+# Die Entity-IDs der Sensoren können je nach Sprache und Name der Integration
+# abweichen. Prüfe sie unter Entwicklerwerkzeuge > Zustände.
+# ---------------------------------------------------------------------------
+
+title: Tickets
+views:
+  # -------------------------------------------------------------------------
+  # Ansicht 1: Tickets einreichen (für alle Nutzer)
+  # -------------------------------------------------------------------------
+  - title: Einreichen
+    path: ticket-einreichen
+    icon: mdi:ticket-plus-outline
+    cards:
+      - type: custom:ticket-submit-card
+        title: Neues Ticket einreichen
+        subtitle: Dein Anliegen landet direkt in der Ticket-Verwaltung.
+        default_priority: medium
+        show_priority: true
+        show_description: true
+        allow_author: true
+        button_label: Ticket absenden
+        success_message: Danke! Dein Ticket wurde erstellt.
+
+      - type: entities
+        title: Ticket-Übersicht
+        state_color: true
+        entities:
+          - entity: sensor.ticketsystem_offene_tickets
+            name: Offen
+          - entity: sensor.ticketsystem_tickets_in_bearbeitung
+            name: In Bearbeitung
+          - entity: sensor.ticketsystem_kritische_tickets
+            name: Kritisch (aktiv)
+          - entity: sensor.ticketsystem_tickets_gesamt
+            name: Gesamt
+
+  # -------------------------------------------------------------------------
+  # Ansicht 2: Tickets verwalten (für Admins / Bearbeiter)
+  # -------------------------------------------------------------------------
+  - title: Verwaltung
+    path: ticket-verwaltung
+    icon: mdi:ticket-account
+    cards:
+      - type: custom:ticket-list-card
+        title: Ticket-Verwaltung
+        subtitle: Standardmäßig nach Dringlichkeit sortiert – Kritisch zuerst.
+        show_closed: true
+        show_description: true
+        allow_status_change: true
+        allow_delete: true
+        default_status_filter: all
+
+      # Kompakte Zweitkarte: nur aktive Tickets, maximal 5 Einträge
+      - type: custom:ticket-list-card
+        title: Nächste Aufgaben
+        show_closed: false
+        show_description: false
+        allow_delete: false
+        max_items: 5

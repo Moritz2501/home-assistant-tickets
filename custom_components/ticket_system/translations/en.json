@@ -1,0 +1,109 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Ticket System",
+        "description": "Creates a local ticket system. Tickets are stored inside Home Assistant.",
+        "data": {
+          "name": "Name of the integration"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "The ticket system is already set up. Only one instance is possible."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "open_tickets": {
+        "name": "Open tickets"
+      },
+      "in_progress_tickets": {
+        "name": "Tickets in progress"
+      },
+      "critical_tickets": {
+        "name": "Critical tickets"
+      },
+      "total_tickets": {
+        "name": "Total tickets"
+      }
+    }
+  },
+  "services": {
+    "create": {
+      "name": "Create ticket",
+      "description": "Creates a new ticket.",
+      "fields": {
+        "title": {
+          "name": "Title",
+          "description": "Short summary of the ticket."
+        },
+        "description": {
+          "name": "Description",
+          "description": "Detailed description of the issue."
+        },
+        "priority": {
+          "name": "Priority",
+          "description": "Urgency: low, medium, high or critical."
+        },
+        "status": {
+          "name": "Status",
+          "description": "Initial status of the ticket."
+        },
+        "author": {
+          "name": "Author",
+          "description": "Creator of the ticket."
+        }
+      }
+    },
+    "update": {
+      "name": "Update ticket",
+      "description": "Updates one or more fields of an existing ticket.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket ID",
+          "description": "ID of the ticket to update."
+        },
+        "title": {
+          "name": "Title"
+        },
+        "description": {
+          "name": "Description"
+        },
+        "priority": {
+          "name": "Priority"
+        },
+        "status": {
+          "name": "Status"
+        },
+        "author": {
+          "name": "Author"
+        }
+      }
+    },
+    "set_status": {
+      "name": "Set ticket status",
+      "description": "Changes only the status of a ticket.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket ID",
+          "description": "ID of the ticket."
+        },
+        "status": {
+          "name": "Status",
+          "description": "New status: open, in_progress or closed."
+        }
+      }
+    },
+    "delete": {
+      "name": "Delete ticket",
+      "description": "Deletes a ticket permanently.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket ID",
+          "description": "ID of the ticket to delete."
+        }
+      }
+    }
+  }
+}

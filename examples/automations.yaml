@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------------------
+# Beispiel-Automationen für das Ticketsystem
+# Einstellungen > Automationen & Szenen > Automationen > "Automation erstellen"
+# > drei Punkte > "In YAML bearbeiten"
+# ---------------------------------------------------------------------------
+
+# 1) Kritische Tickets sofort als Benachrichtigung melden
+- alias: "Ticket: kritische Tickets melden"
+  description: "Sendet eine Benachrichtigung, sobald ein kritisches Ticket erstellt wird."
+  trigger:
+    - platform: event
+      event_type: ticket_system_ticket_created
+  condition:
+    - condition: template
+      value_template: "{{ trigger.event.data.ticket.priority == 'critical' }}"
+  action:
+    - service: notify.persistent_notification
+      data:
+        title: "Kritisches Ticket: {{ trigger.event.data.ticket.title }}"
+        message: >-
+          Erstellt von {{ trigger.event.data.ticket.author }}
+          (ID {{ trigger.event.data.ticket.id }}):
+
+          {{ trigger.event.data.ticket.description }}
+  mode: queued
+
+# 2) Neues Ticket im Logbuch festhalten
+- alias: "Ticket: neues Ticket loggen"
+  trigger:
+    - platform: event
+      event_type: ticket_system_ticket_created
+  action:
+    - service: logbook.log
+      data:
+        name: "Ticketsystem"
+        message: >-
+          Neues Ticket "{{ trigger.event.data.ticket.title }}"
+          ({{ trigger.event.data.ticket.priority }})
+          von {{ trigger.event.data.ticket.author }}
+        entity_id: sensor.ticketsystem_offene_tickets
+  mode: queued
+
+# 3) Ticket per Service erstellen und die ID weiterverwenden
+- alias: "Ticket: bei Wasseralarm automatisch Ticket anlegen"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.wasserleck_kuche
+      to: "on"
+  action:
+    - service: ticket_system.create
+      data:
+        title: "Wasserleck in der Küche"
+        description: "Der Wassermelder hat ausgelöst. Bitte sofort prüfen."
+        priority: critical
+        author: "Home Assistant"
+      response_variable: ticket_result
+    - service: notify.persistent_notification
+      data:
+        title: "Ticket angelegt"
+        message: "Ticket-ID: {{ ticket_result.ticket_id }}"
+  mode: single

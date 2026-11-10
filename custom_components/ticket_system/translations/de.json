@@ -1,0 +1,109 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ticketsystem einrichten",
+        "description": "Richtet ein lokales Ticketsystem ein. Die Tickets werden direkt in Home Assistant gespeichert.",
+        "data": {
+          "name": "Name der Integration"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Das Ticketsystem ist bereits eingerichtet. Es kann nur eine Instanz geben."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "open_tickets": {
+        "name": "Offene Tickets"
+      },
+      "in_progress_tickets": {
+        "name": "Tickets in Bearbeitung"
+      },
+      "critical_tickets": {
+        "name": "Kritische Tickets"
+      },
+      "total_tickets": {
+        "name": "Tickets gesamt"
+      }
+    }
+  },
+  "services": {
+    "create": {
+      "name": "Ticket erstellen",
+      "description": "Erstellt ein neues Ticket.",
+      "fields": {
+        "title": {
+          "name": "Titel",
+          "description": "Kurze Zusammenfassung des Tickets."
+        },
+        "description": {
+          "name": "Beschreibung",
+          "description": "Ausführliche Beschreibung des Problems."
+        },
+        "priority": {
+          "name": "Dringlichkeit",
+          "description": "Niedrig, Mittel, Hoch oder Kritisch."
+        },
+        "status": {
+          "name": "Status",
+          "description": "Anfangsstatus des Tickets."
+        },
+        "author": {
+          "name": "Ersteller",
+          "description": "Person, die das Ticket erstellt."
+        }
+      }
+    },
+    "update": {
+      "name": "Ticket bearbeiten",
+      "description": "Aktualisiert ein oder mehrere Felder eines bestehenden Tickets.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket-ID",
+          "description": "ID des zu bearbeitenden Tickets."
+        },
+        "title": {
+          "name": "Titel"
+        },
+        "description": {
+          "name": "Beschreibung"
+        },
+        "priority": {
+          "name": "Dringlichkeit"
+        },
+        "status": {
+          "name": "Status"
+        },
+        "author": {
+          "name": "Ersteller"
+        }
+      }
+    },
+    "set_status": {
+      "name": "Ticket-Status setzen",
+      "description": "Ändert ausschließlich den Status eines Tickets.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket-ID",
+          "description": "ID des Tickets."
+        },
+        "status": {
+          "name": "Status",
+          "description": "Neuer Status: Offen, In Bearbeitung oder Abgeschlossen."
+        }
+      }
+    },
+    "delete": {
+      "name": "Ticket löschen",
+      "description": "Löscht ein Ticket dauerhaft.",
+      "fields": {
+        "ticket_id": {
+          "name": "Ticket-ID",
+          "description": "ID des zu löschenden Tickets."
+        }
+      }
+    }
+  }
+}

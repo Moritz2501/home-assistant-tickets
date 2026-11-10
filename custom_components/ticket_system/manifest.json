@@ -1,0 +1,14 @@
+{
+  "domain": "ticket_system",
+  "name": "Ticketsystem",
+  "codeowners": ["@YOUR_GITHUB_USERNAME"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "websocket_api"],
+  "documentation": "https://github.com/YOUR_GITHUB_USERNAME/ha-ticket-system",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/YOUR_GITHUB_USERNAME/ha-ticket-system/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.0.0"
+}
