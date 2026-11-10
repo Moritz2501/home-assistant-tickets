@@ -76,6 +76,16 @@ class TicketSystemOptionsFlow(OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=_options_schema(self.hass, options),
+            # Die Platzhalter dokumentieren die Variablen des TTS-Templates. Sie
+            # werden als reiner Text übergeben, weil das Frontend die
+            # Beschreibung als ICU-Nachricht formatiert und unbekannte
+            # Variablen sonst als Fehler protokolliert (MISSING_VALUE).
+            description_placeholders={
+                "title": "{title}",
+                "priority": "{priority}",
+                "author": "{author}",
+                "id": "{id}",
+            },
         )
 
 
