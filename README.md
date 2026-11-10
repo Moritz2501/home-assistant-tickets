@@ -317,8 +317,14 @@ die übrigen Dienste funktionieren weiter.
 ### Registrierung
 
 Die Integration liefert die Datei `ticket-system-cards.js` selbst aus und lädt sie als
-JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.2`). **Du musst keine Ressource
+JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.3`). **Du musst keine Ressource
 manuell anlegen.**
+
+Ab Home Assistant 2026.8 ersetzt das Frontend `window.customElements` beim Start durch
+ein Polyfill für „scoped custom element registries“. Module, die wie hier über
+`add_extra_js_url` eingebunden werden, laufen häufig vorher – ihre Registrierung geht
+dann still verloren und die Karte meldet „Custom element doesn't exist“. Die Karte
+registriert sich deshalb selbst erneut, sobald das Polyfill aktiv ist (ab 1.1.3).
 
 Nach der Installation:
 
@@ -331,7 +337,7 @@ kannst du sie als Fallback manuell registrieren:
 
 | Feld | Wert |
 | --- | --- |
-| URL | `/ticket_system/ticket-system-cards.js?v=1.1.2` |
+| URL | `/ticket_system/ticket-system-cards.js?v=1.1.3` |
 | Typ | JavaScript-Modul |
 
 ### Karte: `custom:ticket-submit-card`
@@ -511,7 +517,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 2. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
    `home-assistant`, `hacs`, `integration`, `ticket-system`, `lovelace`.
 
-3. Release erstellen (`v1.1.2`) – HACS löst darüber Updates aus und zeigt die Version an.
+3. Release erstellen (`v1.1.3`) – HACS löst darüber Updates aus und zeigt die Version an.
    Tag und Version in `manifest.json` sollten übereinstimmen.
 
 4. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
@@ -527,6 +533,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 
 | Problem | Ursache / Lösung |
 | --- | --- |
+| „Custom element doesn't exist: ticket-…-card“ | Das Frontend hat `window.customElements` nach dem Laden ausgetauscht (ab HA 2026.8) und die Registrierung ging verloren. Ab 1.1.3 registriert sich die Karte selbst neu – Seite mit `Strg + F5` neu laden. Bleibt es dabei: Ressource manuell anlegen (siehe „Registrierung“) und im Browser prüfen, ob `http://<dein-ha>:8123/ticket_system/ticket-system-cards.js` ausgeliefert wird. |
 | Karten erscheinen nicht in der Kartenauswahl | Integration einmal neu laden (Einstellungen → Geräte & Dienste → Ticketsystem → Neu laden), dann Browser mit `Strg + F5` neu laden. Prüfe, ob `http://<dein-ha>:8123/ticket_system/ticket-system-cards.js` erreichbar ist. |
 | „Tickets konnten nicht geladen werden“ | Die Integration ist nicht (mehr) eingerichtet. Unter Geräte & Dienste prüfen und ggf. neu hinzufügen; Log auf `ticket_system`-Fehler prüfen. |
 | Änderungen kommen nicht an | Mehrere Browser-Tabs offen? Die Karte aktualisiert sich per Push; ein Reload der Seite hilft. |

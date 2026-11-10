@@ -16,7 +16,7 @@
     return; // bereits geladen
   }
 
-  const VERSION = "1.1.2";
+  const VERSION = "1.1.3";
   const DOMAIN = "ticket_system";
 
   const PRIORITIES = ["low", "medium", "high", "critical"];
@@ -1348,10 +1348,26 @@
   /* Registrierung                                                       */
   /* ------------------------------------------------------------------ */
 
-  customElements.define("ticket-submit-card", TicketSubmitCard);
-  customElements.define("ticket-list-card", TicketListCard);
-  customElements.define("ticket-submit-card-editor", TicketSubmitCardEditor);
-  customElements.define("ticket-list-card-editor", TicketListCardEditor);
+  const CARD_ELEMENTS = [
+    ["ticket-submit-card", TicketSubmitCard],
+    ["ticket-list-card", TicketListCard],
+    ["ticket-submit-card-editor", TicketSubmitCardEditor],
+    ["ticket-list-card-editor", TicketListCardEditor],
+  ];
+
+  const defineElements = () => {
+    for (const [tag, ctor] of CARD_ELEMENTS) {
+      if (customElements.get(tag)) continue;
+      try {
+        customElements.define(tag, ctor);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(`TICKET-SYSTEM: ${tag} nicht registrierbar`, err);
+      }
+    }
+  };
+
+  defineElements();
 
   window.customCards = window.customCards || [];
   window.customCards.push(
@@ -1370,6 +1386,32 @@
       preview: true,
     }
   );
+
+  /*
+   * Das Home-Assistant-Frontend ersetzt beim Start window.customElements durch
+   * das Polyfill für "scoped custom element registries". Module, die über
+   * add_extra_js_url eingebunden werden, laufen häufig vorher – ihre
+   * Registrierungen sind danach unsichtbar und die Karte meldet "Custom
+   * element doesn't exist" (home-assistant/frontend#53890). Deshalb nach der
+   * Übernahme erneut registrieren, bis die Elemente in der neuen Registry
+   * stehen.
+   */
+  const registryAtLoad = window.customElements;
+  let recheckTimer = null;
+  let recheckCount = 0;
+
+  const syncRegistration = () => {
+    defineElements();
+    recheckCount += 1;
+    const polyfillActive = window.customElements !== registryAtLoad;
+    if (polyfillActive || recheckCount >= 24) {
+      window.clearInterval(recheckTimer);
+      window.removeEventListener("load", syncRegistration);
+    }
+  };
+
+  recheckTimer = window.setInterval(syncRegistration, 250);
+  window.addEventListener("load", syncRegistration);
 
   // eslint-disable-next-line no-console
   console.info(
