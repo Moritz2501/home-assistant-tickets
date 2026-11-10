@@ -33,6 +33,7 @@ from .const import (
     CONF_TTS_ENTITY,
     CONF_TTS_MEDIA_PLAYERS,
     CONF_TTS_MESSAGE,
+    CONF_TTS_VOLUME,
     DATA_NOTIFIER,
     DEFAULT_OPTIONS,
     DEFAULT_TTS_MESSAGE,
@@ -71,8 +72,19 @@ ALEXA_NOTIFY_SUFFIXES: Final = (
 )
 ALEXA_NOTIFY_KEYS: Final = ("announce", "speak")
 ALEXA_DEVICES_DOMAIN: Final = "alexa_devices"
+MEDIA_PLAYER_DOMAIN: Final = "media_player"
+VOLUME_SERVICE: Final = "volume_set"
 
 MAX_DESCRIPTION_IN_MESSAGE = 500
+
+
+def _volume_level(value: Any) -> float:
+    """Lautstärke aus den Optionen als Pegel zwischen 0 und 1 (0 = aus)."""
+    try:
+        percent = int(round(float(value)))
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0, min(100, percent)) / 100
 
 
 def _registry_entry(hass: HomeAssistant, entity_id: str) -> Any:
@@ -435,6 +447,9 @@ class TicketNotifier:
         )
         alexa_service = _alexa_media_service(self.hass)
 
+        # Optionale Lautstärke (Prozent, 0 = vor der Ansage nicht ändern)
+        volume_level = _volume_level(conf.get(CONF_TTS_VOLUME))
+
         if tts_configured and not tts_available:
             self._warn_once(
                 "tts.speak",
@@ -446,6 +461,11 @@ class TicketNotifier:
         for player in players:
             errors: list[str] = []
             handled = False
+
+            if volume_level > 0:
+                err = await self._async_set_volume(player, volume_level)
+                if err is not None:
+                    errors.append(f"volume_set: {err}")
 
             # 1) Alexa-Geräte (Integration "Alexa Devices"): Speak-/Announce-Entität
             #    des Geräts. Deren Mediaplayer nimmt keine gestreamten Dateien an.
@@ -510,6 +530,26 @@ class TicketNotifier:
                     "Alexa-Integration (Alexa Devices, Alexa Media Player). Die "
                     "Benachrichtigung selbst wurde trotzdem gesendet.",
                 )
+
+    async def _async_set_volume(
+        self, player: str, level: float
+    ) -> Exception | None:
+        """Setzt die Lautstärke eines Players vor der Ansage."""
+        if not self.hass.services.has_service(MEDIA_PLAYER_DOMAIN, VOLUME_SERVICE):
+            return RuntimeError(
+                f"{MEDIA_PLAYER_DOMAIN}.{VOLUME_SERVICE} ist nicht verfügbar"
+            )
+        try:
+            await self.hass.services.async_call(
+                MEDIA_PLAYER_DOMAIN,
+                VOLUME_SERVICE,
+                {"entity_id": player, "volume_level": level},
+                blocking=True,
+            )
+        except Exception as err:  # noqa: BLE001
+            return err
+        _LOGGER.debug("Ticketsystem: Lautstärke von %s auf %s gesetzt", player, level)
+        return None
 
     async def _async_notify_entity(self, entity_id: str, text: str) -> Exception | None:
         """Spricht Text über eine Speak-/Announce-Entität (``alexa_devices``)."""

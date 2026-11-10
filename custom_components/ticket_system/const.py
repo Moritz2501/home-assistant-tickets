@@ -7,7 +7,7 @@ from typing import Any, Final
 
 DOMAIN: Final = "ticket_system"
 NAME: Final = "Ticketsystem"
-VERSION: Final = "1.1.6"
+VERSION: Final = "1.1.7"
 
 # ---------------------------------------------------------------------------
 # Konfiguration
@@ -136,6 +136,7 @@ CONF_NOTIFY_CRITICAL_TTS: Final = "notify_critical_tts"
 CONF_TTS_ENTITY: Final = "tts_entity"
 CONF_TTS_MEDIA_PLAYERS: Final = "tts_media_players"
 CONF_TTS_MESSAGE: Final = "tts_message"
+CONF_TTS_VOLUME: Final = "tts_volume"
 
 DEFAULT_NOTIFY_SERVICES: Final = ["notify.persistent_notification"]
 DEFAULT_TTS_MESSAGE: Final = (
@@ -151,6 +152,8 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_TTS_ENTITY: None,
     CONF_TTS_MEDIA_PLAYERS: [],
     CONF_TTS_MESSAGE: DEFAULT_TTS_MESSAGE,
+    # 0 = Lautstärke vor der Ansage nicht anfassen (Prozent).
+    CONF_TTS_VOLUME: 0,
 }
 
 ATTR_NOTIFY: Final = "notify"

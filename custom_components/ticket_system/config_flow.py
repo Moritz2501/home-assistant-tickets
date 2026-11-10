@@ -25,6 +25,7 @@ from .const import (
     CONF_TTS_ENTITY,
     CONF_TTS_MEDIA_PLAYERS,
     CONF_TTS_MESSAGE,
+    CONF_TTS_VOLUME,
     DEFAULT_NAME,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -138,6 +139,17 @@ def _options_schema(hass: HomeAssistant, options: dict[str, Any]) -> vol.Schema:
             ): selector.TextSelector(
                 selector.TextSelectorConfig(multiline=True)
             ),
+            vol.Optional(
+                CONF_TTS_VOLUME, default=current(CONF_TTS_VOLUME)
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=100,
+                    step=5,
+                    mode=selector.NumberSelectorMode.SLIDER,
+                    unit_of_measurement="%",
+                )
+            ),
         }
     )
 
@@ -181,6 +193,7 @@ def _normalize_options(user_input: dict[str, Any]) -> dict[str, Any]:
         tts_entity = None
 
     tts_message = str(user_input.get(CONF_TTS_MESSAGE) or "").strip()
+    tts_volume = _clean_volume(user_input.get(CONF_TTS_VOLUME))
 
     return {
         CONF_NOTIFY_SERVICES: services,
@@ -193,7 +206,17 @@ def _normalize_options(user_input: dict[str, Any]) -> dict[str, Any]:
         CONF_TTS_ENTITY: tts_entity,
         CONF_TTS_MEDIA_PLAYERS: players,
         CONF_TTS_MESSAGE: tts_message or DEFAULT_OPTIONS[CONF_TTS_MESSAGE],
+        CONF_TTS_VOLUME: tts_volume,
     }
+
+
+def _clean_volume(value: Any) -> int:
+    """Lautstärke in Prozent (0–100); 0 bedeutet "nicht ändern"."""
+    try:
+        volume = int(round(float(value)))
+    except (TypeError, ValueError):
+        return DEFAULT_OPTIONS[CONF_TTS_VOLUME]
+    return max(0, min(100, volume))
 
 
 def _clean_services(value: Any) -> list[str]:

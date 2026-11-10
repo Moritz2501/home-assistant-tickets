@@ -26,10 +26,12 @@
           "notify_critical_tts": "Speak critical tickets aloud",
           "tts_entity": "Text-to-speech entity",
           "tts_media_players": "Media players for announcements",
-          "tts_message": "Spoken text"
+          "tts_message": "Spoken text",
+          "tts_volume": "Volume before the announcement"
         },
         "data_description": {
-          "tts_message": "Placeholders: {title}, {priority}, {author}, {id}"
+          "tts_message": "Placeholders: {title}, {priority}, {author}, {id}",
+          "tts_volume": "0 % = leave the volume unchanged"
         }
       }
     }

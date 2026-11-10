@@ -26,10 +26,12 @@
           "notify_critical_tts": "Kritische Tickets ansagen",
           "tts_entity": "TTS-Entität",
           "tts_media_players": "Mediaplayer für Ansagen",
-          "tts_message": "Gesprochener Text"
+          "tts_message": "Gesprochener Text",
+          "tts_volume": "Lautstärke vor der Ansage"
         },
         "data_description": {
-          "tts_message": "Platzhalter: {title}, {priority}, {author}, {id}"
+          "tts_message": "Platzhalter: {title}, {priority}, {author}, {id}",
+          "tts_volume": "0 % = Lautstärke nicht ändern"
         }
       }
     }
