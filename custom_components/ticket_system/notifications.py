@@ -321,29 +321,29 @@ class TicketNotifier:
                         },
                         blocking=True,
                     )
+                    continue
                 except Exception as err:  # noqa: BLE001 - ein Player darf die anderen nicht blockieren
+                    # Echo-Geräte (Alexa Media Player) nehmen die von tts.speak
+                    # gestreamte Audiodatei nicht an und antworten z. B. mit
+                    # "music is not available as a music provider". Dort klappt
+                    # die Ansage über notify.alexa_media mit type: tts.
+                    alexa_err = await self._async_alexa_speak(player, text)
+                    if alexa_err is None:
+                        continue
                     _LOGGER.warning(
-                        "Ticketsystem: Sprachausgabe auf %s fehlgeschlagen: %s",
+                        "Ticketsystem: Sprachausgabe auf %s fehlgeschlagen: %s "
+                        "(Alexa-Ausgabe ebenfalls: %s)",
                         player,
                         err,
+                        alexa_err,
                     )
             return
 
         # Ohne TTS-Entität: Alexa Media Player unterstützt Sprachausgaben direkt
         if self.hass.services.has_service(NOTIFY_DOMAIN, ALEXA_NOTIFY_SERVICE):
             for player in players:
-                try:
-                    await self.hass.services.async_call(
-                        NOTIFY_DOMAIN,
-                        ALEXA_NOTIFY_SERVICE,
-                        {
-                            "message": text,
-                            "target": player,
-                            "data": {"type": "tts"},
-                        },
-                        blocking=True,
-                    )
-                except Exception as err:  # noqa: BLE001
+                err = await self._async_alexa_speak(player, text)
+                if err is not None:
                     _LOGGER.warning(
                         "Ticketsystem: Alexa-Sprachausgabe auf %s fehlgeschlagen: %s",
                         player,
@@ -357,6 +357,34 @@ class TicketNotifier:
             "TTS-Entität (tts.*) in den Optionen – oder Alexa Media Player. "
             "Die Benachrichtigung selbst wurde trotzdem gesendet.",
         )
+
+    async def _async_alexa_speak(self, player: str, text: str) -> Exception | None:
+        """Spricht einen Text über Alexa Media Player.
+
+        Gibt ``None`` zurück, wenn die Ansage abgeschickt wurde, sonst den
+        aufgetretenen Fehler (oder einen Hinweis, falls der Dienst fehlt).
+        """
+        if not self.hass.services.has_service(NOTIFY_DOMAIN, ALEXA_NOTIFY_SERVICE):
+            return RuntimeError(f"notify.{ALEXA_NOTIFY_SERVICE} ist nicht verfügbar")
+        try:
+            await self.hass.services.async_call(
+                NOTIFY_DOMAIN,
+                ALEXA_NOTIFY_SERVICE,
+                {
+                    "message": text,
+                    "target": player,
+                    "data": {"type": "tts"},
+                },
+                blocking=True,
+            )
+        except Exception as err:  # noqa: BLE001
+            return err
+        _LOGGER.debug(
+            "Ticketsystem: Ansage über notify.%s auf %s gesendet",
+            ALEXA_NOTIFY_SERVICE,
+            player,
+        )
+        return None
 
     # ------------------------------------------------------------------
     # Hilfsfunktionen

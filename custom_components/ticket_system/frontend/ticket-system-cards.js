@@ -16,7 +16,7 @@
     return; // bereits geladen
   }
 
-  const VERSION = "1.1.3";
+  const VERSION = "1.1.4";
   const DOMAIN = "ticket_system";
 
   const PRIORITIES = ["low", "medium", "high", "critical"];

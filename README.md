@@ -317,7 +317,7 @@ die übrigen Dienste funktionieren weiter.
 ### Registrierung
 
 Die Integration liefert die Datei `ticket-system-cards.js` selbst aus und lädt sie als
-JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.3`). **Du musst keine Ressource
+JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.4`). **Du musst keine Ressource
 manuell anlegen.**
 
 Ab Home Assistant 2026.8 ersetzt das Frontend `window.customElements` beim Start durch
@@ -337,7 +337,7 @@ kannst du sie als Fallback manuell registrieren:
 
 | Feld | Wert |
 | --- | --- |
-| URL | `/ticket_system/ticket-system-cards.js?v=1.1.3` |
+| URL | `/ticket_system/ticket-system-cards.js?v=1.1.4` |
 | Typ | JavaScript-Modul |
 
 ### Karte: `custom:ticket-submit-card`
@@ -517,7 +517,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 2. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
    `home-assistant`, `hacs`, `integration`, `ticket-system`, `lovelace`.
 
-3. Release erstellen (`v1.1.3`) – HACS löst darüber Updates aus und zeigt die Version an.
+3. Release erstellen (`v1.1.4`) – HACS löst darüber Updates aus und zeigt die Version an.
    Tag und Version in `manifest.json` sollten übereinstimmen.
 
 4. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
@@ -542,6 +542,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 | Nach einem Update alte Kartendarstellung | `?v=`-Parameter der Ressource bzw. Browser-Cache leeren. |
 | Keine Benachrichtigung bei neuen Tickets | Optionen der Integration prüfen (Team-Dienste, „Bei neuen Tickets benachrichtigen“) und ob das Ticket mit abgewählter Benachrichtigung erstellt wurde (`notify: false`). |
 | Kritisches Ticket wird nicht angesagt | Ohne TTS-Entität braucht es Alexa Media Player und mindestens einen Mediaplayer; siehe einmalige Warnung im Log. |
+| Log: „Sprachausgabe auf media_player… fehlgeschlagen: … music is not available as a music provider“ | Der Zielplayer ist ein Echo/Alexa-Gerät. `tts.speak` streamt eine Audiodatei, die Alexa Media Player nicht als Musik annimmt (der Fehler stammt aus `aioamazondevices`). Ab 1.1.4 fällt die Integration pro Player automatisch auf `notify.alexa_media` mit `type: tts` zurück. Bleibt die Ansage aus, im Alexa-Media-Player prüfen, ob Ansagen erlaubt sind, und ob die Geräte online sind. |
 | „Es konnte keine Benachrichtigung gesendet werden“ | In den Optionen steht kein vorhandener `notify`-Dienst. Unter Entwicklerwerkzeuge → Aktionen prüfen, welcher Dienst existiert. |
 
 Logs: **Einstellungen → System → Protokolle**, Filter `ticket_system`.
