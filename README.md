@@ -274,7 +274,7 @@ sofort, ein Neustart ist nicht nötig.
 | TTS-Entität | – | `tts.*`, z. B. `tts.cloud` oder `tts.piper` |
 | Mediaplayer für Ansagen | leer | eine oder mehrere `media_player.*`-Entitäten |
 | Gesprochener Text | `Kritisches Ticket im Ticketsystem: {title}. Bitte sofort prüfen.` | Platzhalter: `{title}`, `{priority}`, `{author}`, `{id}` |
-| Lautstärke vor der Ansage | 0 % | setzt vor jeder Ansage `media_player.volume_set` (0–100 %, **0 % = Lautstärke nicht ändern**) |
+| Lautstärke vor der Ansage | 0 % | setzt vor jeder Ansage `media_player.volume_set` (0–100 %, **0 % = Lautstärke nicht ändern**); der alte Pegel wird danach wiederhergestellt |
 
 ### Was wann passiert
 
@@ -305,8 +305,11 @@ die per Automation aus einem bekannten Ereignis entstehen.
   einmaliger Hinweis, was fehlt.
 - Mit **Lautstärke vor der Ansage** (Option, 0–100 %) wird pro Player zuerst
   `media_player.volume_set` aufgerufen und danach angesagt – so ist ein leise
-  gedrehter Echo oder Sonos nicht zu überhören. Die vorherige Lautstärke wird nicht
-  zurückgesetzt; bei 0 % bleibt sie unangetastet.
+  gedrehter Echo oder Sonos nicht zu überhören. Die vorherige Lautstärke merkt sich
+  die Integration und stellt sie etwa 15 Sekunden später wieder her (Ansagen laufen
+  asynchron, vorher würde die Ansage leiser werden). Bei 0 % bleibt der Pegel
+  unangetastet; meldet der Player keinen Pegel (z. B. offline), wird nichts
+  zurückgesetzt.
 - Unbekannte Platzhalter bleiben im Text stehen, ein syntaktisch kaputtes Template fällt
   auf den Standardtext zurück.
 
@@ -329,7 +332,7 @@ die übrigen Dienste funktionieren weiter.
 ### Registrierung
 
 Die Integration liefert die Datei `ticket-system-cards.js` selbst aus und lädt sie als
-JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.7`). **Du musst keine Ressource
+JS-Modul (`/ticket_system/ticket-system-cards.js?v=1.1.8`). **Du musst keine Ressource
 manuell anlegen.**
 
 Ab Home Assistant 2026.8 ersetzt das Frontend `window.customElements` beim Start durch
@@ -349,7 +352,7 @@ kannst du sie als Fallback manuell registrieren:
 
 | Feld | Wert |
 | --- | --- |
-| URL | `/ticket_system/ticket-system-cards.js?v=1.1.7` |
+| URL | `/ticket_system/ticket-system-cards.js?v=1.1.8` |
 | Typ | JavaScript-Modul |
 
 ### Karte: `custom:ticket-submit-card`
@@ -529,7 +532,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 2. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
    `home-assistant`, `hacs`, `integration`, `ticket-system`, `lovelace`.
 
-3. Release erstellen (`v1.1.7`) – HACS löst darüber Updates aus und zeigt die Version an.
+3. Release erstellen (`v1.1.8`) – HACS löst darüber Updates aus und zeigt die Version an.
    Tag und Version in `manifest.json` sollten übereinstimmen.
 
 4. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
@@ -554,7 +557,7 @@ Automatisierungen sehen dieselben Änderungen sofort.
 | Nach einem Update alte Kartendarstellung | `?v=`-Parameter der Ressource bzw. Browser-Cache leeren. |
 | Keine Benachrichtigung bei neuen Tickets | Optionen der Integration prüfen (Team-Dienste, „Bei neuen Tickets benachrichtigen“) und ob das Ticket mit abgewählter Benachrichtigung erstellt wurde (`notify: false`). |
 | Kritisches Ticket wird nicht angesagt | Es braucht mindestens einen Mediaplayer und entweder eine TTS-Entität (`tts.*`) oder ein Alexa-Gerät mit Speak-/Announce-Entität („Alexa Devices“) bzw. Alexa Media Player; siehe einmalige Warnung im Log. |
-| Log: „Sprachausgabe auf media_player… fehlgeschlagen: … music is not available as a music provider“ | Der Zielplayer ist ein Echo-Gerät. `tts.speak` schickt eine Audiodatei an den Player, und Echo-Geräte lehnen das über `aioamazondevices` mit dieser Meldung ab. Ab **1.1.7** erkennt die Integration den Player und sagt direkt über seine Speak-/Announce-Entität an (Alexa Devices), sonst über Alexa Media Player; `tts.speak` wird für Echo-Geräte übersprungen. Steht in der Warnung zusätzlich ein fehlgeschlagener Alexa-Weg, sind die Geräte offline oder Ansagen in der Alexa-App deaktiviert. |
+| Log: „Sprachausgabe auf media_player… fehlgeschlagen: … music is not available as a music provider“ | Der Zielplayer ist ein Echo-Gerät. `tts.speak` schickt eine Audiodatei an den Player, und Echo-Geräte lehnen das über `aioamazondevices` mit dieser Meldung ab. Ab **1.1.8** erkennt die Integration den Player und sagt direkt über seine Speak-/Announce-Entität an (Alexa Devices), sonst über Alexa Media Player; `tts.speak` wird für Echo-Geräte übersprungen. Steht in der Warnung zusätzlich ein fehlgeschlagener Alexa-Weg, sind die Geräte offline oder Ansagen in der Alexa-App deaktiviert. |
 | „Es konnte keine Benachrichtigung gesendet werden“ | In den Optionen steht kein vorhandener `notify`-Dienst. Unter Entwicklerwerkzeuge → Aktionen prüfen, welcher Dienst existiert. |
 
 Logs: **Einstellungen → System → Protokolle**, Filter `ticket_system`.

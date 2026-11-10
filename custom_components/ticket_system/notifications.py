@@ -13,6 +13,7 @@ beliebige Empfänger).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Final
@@ -76,6 +77,21 @@ MEDIA_PLAYER_DOMAIN: Final = "media_player"
 VOLUME_SERVICE: Final = "volume_set"
 
 MAX_DESCRIPTION_IN_MESSAGE = 500
+
+# Ansagen sind nach ein paar Sekunden vorbei; erst dann wird die vorherige
+# Lautstärke wiederhergestellt, sonst würde die Ansage leiser.
+VOLUME_RESTORE_DELAY: Final = 15
+
+
+def _current_volume(hass: HomeAssistant, player: str) -> float | None:
+    """Aktuelle Lautstärke eines Players (0–1) oder ``None``."""
+    states = getattr(hass, "states", None)
+    state = states.get(player) if states is not None else None
+    attributes = getattr(state, "attributes", None) or {}
+    try:
+        return float(attributes.get("volume_level"))
+    except (TypeError, ValueError):
+        return None
 
 
 def _volume_level(value: Any) -> float:
@@ -462,64 +478,71 @@ class TicketNotifier:
             errors: list[str] = []
             handled = False
 
+            previous_volume: float | None = None
             if volume_level > 0:
+                previous_volume = _current_volume(self.hass, player)
                 err = await self._async_set_volume(player, volume_level)
                 if err is not None:
                     errors.append(f"volume_set: {err}")
 
-            # 1) Alexa-Geräte (Integration "Alexa Devices"): Speak-/Announce-Entität
-            #    des Geräts. Deren Mediaplayer nimmt keine gestreamten Dateien an.
-            notify_entities = _alexa_notify_entities(self.hass, player)
-            for entity_id in notify_entities:
-                err = await self._async_notify_entity(entity_id, text)
-                if err is None:
-                    handled = True
-                    break
-                errors.append(f"{entity_id}: {err}")
-            if handled:
-                continue
+            try:
+                # 1) Alexa-Geräte (Integration "Alexa Devices"): Speak-/Announce-Entität
+                #    des Geräts. Deren Mediaplayer nimmt keine gestreamten Dateien an.
+                notify_entities = _alexa_notify_entities(self.hass, player)
+                for entity_id in notify_entities:
+                    err = await self._async_notify_entity(entity_id, text)
+                    if err is None:
+                        handled = True
+                        break
+                    errors.append(f"{entity_id}: {err}")
+                if handled:
+                    continue
 
-            # Echo-Geräte lehnen die von tts.speak gestreamte Audiodatei ab
-            # ("music is not available as a music provider") – dort wird der Weg
-            # gar nicht erst versucht, sonst stünde der Fehler wieder im Log.
-            echo = bool(notify_entities) or _is_alexa_player(self.hass, player)
-            if echo and not notify_entities:
-                errors.append(
-                    "keine Speak-/Announce-Entität am Gerät gefunden "
-                    "(in der Alexa-App Durchsagen erlauben, Nicht-stören aus)"
-                )
-
-            # 2) Klassischer Weg über tts.speak (Cast, Sonos, ...)
-            if tts_available and not echo:
-                try:
-                    await self.hass.services.async_call(
-                        TTS_DOMAIN,
-                        TTS_SERVICE,
-                        {
-                            "entity_id": tts_entity,
-                            "media_player_entity_id": player,
-                            "message": text,
-                            "cache": True,
-                        },
-                        blocking=True,
+                # Echo-Geräte lehnen die von tts.speak gestreamte Audiodatei ab
+                # ("music is not available as a music provider") – dort wird der Weg
+                # gar nicht erst versucht, sonst stünde der Fehler wieder im Log.
+                echo = bool(notify_entities) or _is_alexa_player(self.hass, player)
+                if echo and not notify_entities:
+                    errors.append(
+                        "keine Speak-/Announce-Entität am Gerät gefunden "
+                        "(in der Alexa-App Durchsagen erlauben, Nicht-stören aus)"
                     )
-                    continue
-                except Exception as err:  # noqa: BLE001 - ein Player darf die anderen nicht blockieren
-                    errors.append(f"tts.speak: {err}")
 
-            # 3) Alexa Media Player (Custom-Integration) als letzter Weg
-            if alexa_service is not None:
-                err = await self._async_alexa_speak(player, text, alexa_service)
-                if err is None:
-                    continue
-                errors.append(f"notify.{alexa_service}: {err}")
+                # 2) Klassischer Weg über tts.speak (Cast, Sonos, ...)
+                if tts_available and not echo:
+                    try:
+                        await self.hass.services.async_call(
+                            TTS_DOMAIN,
+                            TTS_SERVICE,
+                            {
+                                "entity_id": tts_entity,
+                                "media_player_entity_id": player,
+                                "message": text,
+                                "cache": True,
+                            },
+                            blocking=True,
+                        )
+                        continue
+                    except Exception as err:  # noqa: BLE001 - ein Player darf die anderen nicht blockieren
+                        errors.append(f"tts.speak: {err}")
 
-            if errors:
-                _LOGGER.warning(
-                    "Ticketsystem: Sprachausgabe auf %s fehlgeschlagen: %s",
-                    player,
-                    "; ".join(errors),
-                )
+                # 3) Alexa Media Player (Custom-Integration) als letzter Weg
+                if alexa_service is not None:
+                    err = await self._async_alexa_speak(player, text, alexa_service)
+                    if err is None:
+                        continue
+                    errors.append(f"notify.{alexa_service}: {err}")
+
+                if errors:
+                    _LOGGER.warning(
+                        "Ticketsystem: Sprachausgabe auf %s fehlgeschlagen: %s",
+                        player,
+                        "; ".join(errors),
+                    )
+            finally:
+                # Ansage läuft asynchron – erst danach den alten Pegel zurück.
+                if previous_volume is not None:
+                    self._schedule_volume_restore(player, previous_volume)
 
         if not tts_configured and alexa_service is None:
             if not any(_alexa_notify_entities(self.hass, player) for player in players):
@@ -550,6 +573,28 @@ class TicketNotifier:
             return err
         _LOGGER.debug("Ticketsystem: Lautstärke von %s auf %s gesetzt", player, level)
         return None
+
+    def _schedule_volume_restore(self, player: str, level: float) -> None:
+        """Stellt die vorherige Lautstärke nach der Ansage wieder her."""
+        create_task = getattr(self.hass, "async_create_task", None)
+        if not callable(create_task):
+            return
+
+        async def _restore() -> None:
+            if VOLUME_RESTORE_DELAY > 0:
+                await asyncio.sleep(VOLUME_RESTORE_DELAY)
+            err = await self._async_set_volume(player, level)
+            if err is not None:
+                _LOGGER.debug(
+                    "Ticketsystem: Lautstärke von %s nicht zurückgesetzt: %s",
+                    player,
+                    err,
+                )
+
+        try:
+            create_task(_restore())
+        except Exception as err:  # noqa: BLE001 - darf die Ansage nicht stören
+            _LOGGER.debug("Ticketsystem: Zurücksetzen der Lautstärke fehlgeschlagen: %s", err)
 
     async def _async_notify_entity(self, entity_id: str, text: str) -> Exception | None:
         """Spricht Text über eine Speak-/Announce-Entität (``alexa_devices``)."""

@@ -31,7 +31,7 @@
         },
         "data_description": {
           "tts_message": "Placeholders: {title}, {priority}, {author}, {id}",
-          "tts_volume": "0 % = leave the volume unchanged"
+          "tts_volume": "0 % = leave the volume unchanged; the previous level is restored after the announcement"
         }
       }
     }
