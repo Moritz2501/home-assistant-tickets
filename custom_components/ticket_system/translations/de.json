@@ -29,7 +29,7 @@
           "tts_message": "Gesprochener Text"
         },
         "data_description": {
-          "tts_message": "Platzhalter: {title}, {priority}, {author}, {id}"
+          "tts_message": "Platzhalter: '{title}', '{priority}', '{author}', '{id}'"
         }
       }
     }
