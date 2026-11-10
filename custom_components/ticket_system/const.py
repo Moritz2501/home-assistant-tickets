@@ -7,7 +7,7 @@ from typing import Any, Final
 
 DOMAIN: Final = "ticket_system"
 NAME: Final = "Ticketsystem"
-VERSION: Final = "1.1.4"
+VERSION: Final = "1.1.5"
 
 # ---------------------------------------------------------------------------
 # Konfiguration

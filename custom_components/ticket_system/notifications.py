@@ -52,9 +52,77 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 NOTIFY_DOMAIN: Final = "notify"
+NOTIFY_SEND_MESSAGE: Final = "send_message"
 ALEXA_NOTIFY_SERVICE: Final = "alexa_media"
+TTS_DOMAIN: Final = "tts"
+TTS_SERVICE: Final = "speak"
+ALEXA_NOTIFY_SUFFIXES: Final = ("_announce", "_speak")
 
 MAX_DESCRIPTION_IN_MESSAGE = 500
+
+
+def _alexa_notify_entity(hass: HomeAssistant, player: str) -> str | None:
+    """Liefert die Speak-/Announce-Entität, die zu einem Alexa-Player gehört.
+
+    Die Integration ``alexa_devices`` legt pro Gerät ``notify.<gerät>_speak`` und
+    ``notify.<gerät>_announce`` an. Ansagen laufen dort über ``notify.send_message``,
+    während ``media_player.play_media`` (der Weg von ``tts.speak``) bei Echo-Geräten
+    mit "music is not available as a music provider" abbricht.
+    """
+    base = player.split(".", 1)[1] if "." in player else player
+    states = getattr(hass, "states", None)
+    if states is not None:
+        for suffix in ALEXA_NOTIFY_SUFFIXES:
+            entity_id = f"{NOTIFY_DOMAIN}.{base}{suffix}"
+            if states.get(entity_id) is not None:
+                return entity_id
+
+    # Umbenannte Entitäten: über das Gerät des Mediaplayers suchen.
+    try:
+        from homeassistant.helpers import entity_registry as er
+
+        registry = er.async_get(hass)
+        device_id = getattr(registry.async_get(player), "device_id", None)
+        if not device_id:
+            return None
+        candidates = sorted(
+            item.entity_id
+            for item in er.async_entries_for_device(registry, device_id)
+            if item.domain == NOTIFY_DOMAIN and not getattr(item, "disabled_by", None)
+        )
+    except Exception:  # noqa: BLE001 - Registry ist nur eine Zusatzquelle
+        return None
+
+    for suffix in ALEXA_NOTIFY_SUFFIXES:
+        for entity_id in candidates:
+            if entity_id.endswith(suffix):
+                return entity_id
+    return None
+
+
+def _alexa_media_service(hass: HomeAssistant) -> str | None:
+    """Sucht den Notify-Dienst von Alexa Media Player.
+
+    Je nach Version heißt er ``notify.alexa_media`` oder pro Konto
+    ``notify.alexa_media_<konto>``; ``alexa_media_last_called`` wird ausgelassen,
+    weil er ein eigenes Ziel mitbringt.
+    """
+    services = getattr(hass.services, "async_services", None)
+    names: set[str] = set()
+    if callable(services):
+        try:
+            names = set(services().get(NOTIFY_DOMAIN) or {})
+        except Exception:  # noqa: BLE001
+            names = set()
+
+    if ALEXA_NOTIFY_SERVICE in names:
+        return ALEXA_NOTIFY_SERVICE
+    for name in sorted(names):
+        if name.startswith(ALEXA_NOTIFY_SERVICE) and not name.endswith("last_called"):
+            return name
+    if not names and hass.services.has_service(NOTIFY_DOMAIN, ALEXA_NOTIFY_SERVICE):
+        return ALEXA_NOTIFY_SERVICE
+    return None
 
 
 class TicketNotifier:
@@ -299,20 +367,38 @@ class TicketNotifier:
             return
 
         tts_entity = conf.get(CONF_TTS_ENTITY)
-        if isinstance(tts_entity, str) and tts_entity:
-            if not self.hass.services.has_service("tts", "speak"):
-                self._warn_once(
-                    "tts.speak",
-                    "Ticketsystem: tts.speak ist nicht verfügbar – die "
-                    "Sprachausgabe kritischer Tickets wird übersprungen.",
-                )
-                return
+        tts_configured = isinstance(tts_entity, str) and bool(tts_entity)
+        tts_available = tts_configured and self.hass.services.has_service(
+            TTS_DOMAIN, TTS_SERVICE
+        )
+        alexa_service = _alexa_media_service(self.hass)
 
-            for player in players:
+        if tts_configured and not tts_available:
+            self._warn_once(
+                "tts.speak",
+                "Ticketsystem: tts.speak ist nicht verfügbar – die "
+                "Sprachausgabe kritischer Tickets läuft nur noch über eine "
+                "Alexa-Integration, falls eine eingerichtet ist.",
+            )
+
+        for player in players:
+            errors: list[str] = []
+
+            # 1) Alexa-Geräte (Integration "Alexa Devices"): Speak-/Announce-Entität
+            #    des Geräts. Deren Mediaplayer nimmt keine gestreamten Dateien an.
+            notify_entity = _alexa_notify_entity(self.hass, player)
+            if notify_entity is not None:
+                err = await self._async_notify_entity(notify_entity, text)
+                if err is None:
+                    continue
+                errors.append(f"{notify_entity}: {err}")
+
+            # 2) Klassischer Weg über tts.speak (Cast, Sonos, ...)
+            if tts_available:
                 try:
                     await self.hass.services.async_call(
-                        "tts",
-                        "speak",
+                        TTS_DOMAIN,
+                        TTS_SERVICE,
                         {
                             "entity_id": tts_entity,
                             "media_player_entity_id": player,
@@ -323,53 +409,63 @@ class TicketNotifier:
                     )
                     continue
                 except Exception as err:  # noqa: BLE001 - ein Player darf die anderen nicht blockieren
-                    # Echo-Geräte (Alexa Media Player) nehmen die von tts.speak
-                    # gestreamte Audiodatei nicht an und antworten z. B. mit
-                    # "music is not available as a music provider". Dort klappt
-                    # die Ansage über notify.alexa_media mit type: tts.
-                    alexa_err = await self._async_alexa_speak(player, text)
-                    if alexa_err is None:
-                        continue
-                    _LOGGER.warning(
-                        "Ticketsystem: Sprachausgabe auf %s fehlgeschlagen: %s "
-                        "(Alexa-Ausgabe ebenfalls: %s)",
-                        player,
-                        err,
-                        alexa_err,
-                    )
-            return
+                    errors.append(f"tts.speak: {err}")
 
-        # Ohne TTS-Entität: Alexa Media Player unterstützt Sprachausgaben direkt
-        if self.hass.services.has_service(NOTIFY_DOMAIN, ALEXA_NOTIFY_SERVICE):
-            for player in players:
-                err = await self._async_alexa_speak(player, text)
-                if err is not None:
-                    _LOGGER.warning(
-                        "Ticketsystem: Alexa-Sprachausgabe auf %s fehlgeschlagen: %s",
-                        player,
-                        err,
-                    )
-            return
+            # 3) Alexa Media Player (Custom-Integration) als letzter Weg
+            if alexa_service is not None:
+                err = await self._async_alexa_speak(player, text, alexa_service)
+                if err is None:
+                    continue
+                errors.append(f"notify.{alexa_service}: {err}")
 
-        self._warn_once(
-            "tts-missing",
-            "Ticketsystem: Für die Sprachausgabe kritischer Tickets fehlt eine "
-            "TTS-Entität (tts.*) in den Optionen – oder Alexa Media Player. "
-            "Die Benachrichtigung selbst wurde trotzdem gesendet.",
-        )
+            if errors:
+                _LOGGER.warning(
+                    "Ticketsystem: Sprachausgabe auf %s fehlgeschlagen: %s",
+                    player,
+                    "; ".join(errors),
+                )
 
-    async def _async_alexa_speak(self, player: str, text: str) -> Exception | None:
-        """Spricht einen Text über Alexa Media Player.
+        if not tts_configured and alexa_service is None:
+            if not any(_alexa_notify_entity(self.hass, player) for player in players):
+                self._warn_once(
+                    "tts-missing",
+                    "Ticketsystem: Für die Sprachausgabe kritischer Tickets fehlt "
+                    "eine TTS-Entität (tts.*) in den Optionen – oder eine "
+                    "Alexa-Integration (Alexa Devices, Alexa Media Player). Die "
+                    "Benachrichtigung selbst wurde trotzdem gesendet.",
+                )
 
-        Gibt ``None`` zurück, wenn die Ansage abgeschickt wurde, sonst den
-        aufgetretenen Fehler (oder einen Hinweis, falls der Dienst fehlt).
-        """
-        if not self.hass.services.has_service(NOTIFY_DOMAIN, ALEXA_NOTIFY_SERVICE):
-            return RuntimeError(f"notify.{ALEXA_NOTIFY_SERVICE} ist nicht verfügbar")
+    async def _async_notify_entity(self, entity_id: str, text: str) -> Exception | None:
+        """Spricht Text über eine Speak-/Announce-Entität (``alexa_devices``)."""
+        if not self.hass.services.has_service(NOTIFY_DOMAIN, NOTIFY_SEND_MESSAGE):
+            return RuntimeError(
+                f"{NOTIFY_DOMAIN}.{NOTIFY_SEND_MESSAGE} ist nicht verfügbar"
+            )
         try:
             await self.hass.services.async_call(
                 NOTIFY_DOMAIN,
-                ALEXA_NOTIFY_SERVICE,
+                NOTIFY_SEND_MESSAGE,
+                {"message": text},
+                blocking=True,
+                target={"entity_id": entity_id},
+            )
+        except Exception as err:  # noqa: BLE001
+            return err
+        _LOGGER.debug("Ticketsystem: Ansage über %s gesendet", entity_id)
+        return None
+
+    async def _async_alexa_speak(
+        self, player: str, text: str, service: str = ALEXA_NOTIFY_SERVICE
+    ) -> Exception | None:
+        """Spricht einen Text über Alexa Media Player.
+
+        ``service`` ist der Dienstname unter ``notify`` – je nach Version von
+        Alexa Media Player ``alexa_media`` oder ``alexa_media_<konto>``.
+        """
+        try:
+            await self.hass.services.async_call(
+                NOTIFY_DOMAIN,
+                service,
                 {
                     "message": text,
                     "target": player,
@@ -380,9 +476,7 @@ class TicketNotifier:
         except Exception as err:  # noqa: BLE001
             return err
         _LOGGER.debug(
-            "Ticketsystem: Ansage über notify.%s auf %s gesendet",
-            ALEXA_NOTIFY_SERVICE,
-            player,
+            "Ticketsystem: Ansage über notify.%s auf %s gesendet", service, player
         )
         return None
 
