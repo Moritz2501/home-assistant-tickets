@@ -34,7 +34,7 @@ Enthalten sind außerdem:
 ### Variante A: HACS (benutzerdefiniertes Repository)
 
 1. HACS öffnen → Drei-Punkte-Menü oben rechts → **Benutzerdefinierte Repositories**.
-2. Repository-URL eintragen, z. B. `https://github.com/YOUR_GITHUB_USERNAME/ha-ticket-system`.
+2. Repository-URL eintragen: `https://github.com/Moritz2501/home-assistant-tickets`.
 3. Kategorie **Integration** wählen → **Hinzufügen**.
 4. In HACS nach **Ticketsystem** suchen → **Herunterladen**.
 5. Home Assistant neu starten.
@@ -382,32 +382,27 @@ Automatisierungen sehen dieselben Änderungen sofort.
 
 ## Veröffentlichung auf GitHub / HACS
 
-1. Repository anlegen und dieses Verzeichnis pushen:
+1. Repository: <https://github.com/Moritz2501/home-assistant-tickets>. Dieses
+   Verzeichnis liegt dort bereits als `main`; ein eigener Fork wird genauso gepusht:
 
    ```bash
-   git init
+   git init -b main
    git add .
    git commit -m "Ticketsystem: Custom Integration mit Lovelace-Karten"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_GITHUB_USERNAME/ha-ticket-system.git
+   git remote add origin https://github.com/Moritz2501/home-assistant-tickets.git
    git push -u origin main
    ```
 
-2. Platzhalter ersetzen:
-   - `custom_components/ticket_system/manifest.json`: `codeowners`, `documentation`, `issue_tracker`
-   - `LICENSE`: `YOUR NAME`
-   - `README.md`: `YOUR_GITHUB_USERNAME`
-
-3. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
+2. Repository-Einstellungen: Beschreibung setzen und Topics vergeben, z. B.
    `home-assistant`, `hacs`, `integration`, `ticket-system`, `lovelace`.
 
-4. Release erstellen (`v1.0.0`) – HACS löst darüber Updates aus und zeigt die Version an.
+3. Release erstellen (`v1.0.0`) – HACS löst darüber Updates aus und zeigt die Version an.
 
-5. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
+4. Der mitgelieferte Workflow `.github/workflows/validate.yml` prüft bei jedem Push
    `hassfest` und die HACS-Kriterien. Fehlermeldungen dort sind ernst zu nehmen, sie
    sind die gleichen Checks, die HACS beim Aufnehmen anwendet.
 
-6. Nutzer installieren anschließend über **HACS → Benutzerdefinierte Repositories →
+5. Nutzer installieren anschließend über **HACS → Benutzerdefinierte Repositories →
    Kategorie Integration**.
 
 ---

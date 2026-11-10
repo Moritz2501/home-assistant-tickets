@@ -1,13 +1,13 @@
 {
   "domain": "ticket_system",
   "name": "Ticketsystem",
-  "codeowners": ["@YOUR_GITHUB_USERNAME"],
+  "codeowners": ["@Moritz2501"],
   "config_flow": true,
   "dependencies": ["frontend", "http", "websocket_api"],
-  "documentation": "https://github.com/YOUR_GITHUB_USERNAME/ha-ticket-system",
+  "documentation": "https://github.com/Moritz2501/home-assistant-tickets",
   "integration_type": "service",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/YOUR_GITHUB_USERNAME/ha-ticket-system/issues",
+  "issue_tracker": "https://github.com/Moritz2501/home-assistant-tickets/issues",
   "requirements": [],
   "single_config_entry": true,
   "version": "1.0.0"
